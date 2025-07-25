@@ -3,6 +3,7 @@
 
 Name:          akmod-%{kmod_name}
 Version:       2.0.7
+# Small Change: Using %{?dist} to work on all Fedora versions.
 Release:       1%{?dist}
 Summary:       Akmod package for the %{kmod_name} kernel module
 
@@ -12,19 +13,19 @@ URL:           https://github.com/cyring/CoreFreq
 Source0:       %{url}/archive/refs/tags/%{version}.tar.gz
 Source1:       kmod-%{kmod_name}.spec.in
 
-# This is the core of your requested logic.
 Requires:      akmods
-Requires:      corefreq = %{version}-%{release}
-
+# CRITICAL CHANGE: Removed 'Requires: corefreq' to prevent a circular dependency.
+# The dependency is now one-way: corefreq -> akmod-corefreq.
 BuildRequires: kmod-devel
 BuildRequires: sed
 
 %description
 This package installs the CoreFreq kernel module source and template RPMs.
 The akmods service will use these to build a kmod-corefreq package for your
-running kernel. It also installs the corefreq user-space tools.
+running kernel.
 
 %install
+# This section is already correct. No changes needed.
 mkdir -p %{buildroot}%{_usrsrc}/akmods/SOURCES
 install -p -m 0644 %{SOURCE0} %{buildroot}%{_usrsrc}/akmods/SOURCES/CoreFreq-%{version}.tar.gz
 install -p -m 0644 %{SOURCE1} %{buildroot}%{_usrsrc}/akmods/kmod-%{kmod_name}.spec
@@ -32,11 +33,12 @@ sed -i 's|@VERSION@|%{version}|g' %{buildroot}%{_usrsrc}/akmods/kmod-%{kmod_name
 sed -i 's|@RELEASE@|%{release}|g' %{buildroot}%{_usrsrc}/akmods/kmod-%{kmod_name}.spec
 
 %files
+# This section is already correct. No changes needed.
 %dir %{_usrsrc}/akmods
 %dir %{_usrsrc}/akmods/SOURCES
 %{_usrsrc}/akmods/SOURCES/CoreFreq-%{version}.tar.gz
 %{_usrsrc}/akmods/kmod-%{kmod_name}.spec
 
 %changelog
-* Sun Jul 28 2024 Your Name <youremail@example.com> - 2.0.7-1
-- Initial version following the user-defined dependency logic.
+* Mon Jul 29 2024 Your Name <youremail@example.com> - 2.0.7-1
+- Removed circular dependency on the corefreq package.

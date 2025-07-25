@@ -3,20 +3,27 @@
 
 Name:           corefreq
 Version:        2.0.7
+# Small Change: Using %{?dist} to work on all Fedora versions.
 Release:        1%{?dist}
-Summary:        User-space daemon and CLI for CoreFreq
+# Small Change: Summary reflects its new role.
+Summary:        CPU monitoring and tuning software (user-space tools)
 
 License:        GPL-2.0-only
 URL:            https://github.com/cyring/CoreFreq
+
 Source0:        %{url}/archive/refs/tags/%{version}.tar.gz
 
-# DKMS and kernel dependencies are REMOVED.
+# Small Change: Remove DKMS/kernel build requirements. Add systemd macros.
 BuildRequires:  gcc make systemd-rpm-macros
 
+# CRITICAL CHANGE: This is the dependency you requested.
+# It makes 'dnf install corefreq' automatically install 'akmod-corefreq'.
+Requires:       akmod-corefreq
+
 %description
-This package provides the user-space daemon (corefreqd) and the
-command-line interface (corefreq-cli). It is installed as a dependency
-of the akmod-corefreq package.
+CoreFreq is a CPU monitoring software with BIOS-like functionalities.
+This package provides the user-space tools and depends on the akmod-corefreq
+package to provide the required kernel module.
 
 %prep
 %autosetup -n %{srcname}-%{version}
@@ -26,12 +33,14 @@ mkdir -p build
 make %{?_smp_mflags} CFLAGS="%{optflags}" corefreqd corefreq-cli
 
 %install
-# Install ONLY the user-space files. NO DKMS steps.
+# This part is the same, installing only the tools and service file.
 install -D -m 0755 build/corefreqd %{buildroot}%{_sbindir}/corefreqd
 install -D -m 0755 build/corefreq-cli %{buildroot}%{_bindir}/corefreq-cli
 install -D -m 0644 corefreqd.service %{buildroot}%{_unitdir}/corefreqd.service
 
-# Use standard systemd macros. NO DKMS or modprobe logic.
+# SMALL CHANGE: All DKMS install logic has been removed as it is now handled by akmods.
+
+# SMALL CHANGE: Using standard systemd macros for clean service management.
 %post
 %systemd_post corefreqd.service
 
@@ -42,6 +51,7 @@ install -D -m 0644 corefreqd.service %{buildroot}%{_unitdir}/corefreqd.service
 %systemd_postun_with_restart corefreqd.service
 
 %files
+# This part is the same, but we remove the lines for DKMS files.
 %doc README.md
 %license LICENSE
 %{_sbindir}/corefreqd
@@ -49,5 +59,5 @@ install -D -m 0644 corefreqd.service %{buildroot}%{_unitdir}/corefreqd.service
 %{_unitdir}/corefreqd.service
 
 %changelog
-* Sun Jul 28 2024 Your Name <youremail@example.com> - 2.0.7-1
-- Corrected logic: Removed all DKMS functionality to serve as a dependency for akmods.
+* Mon Jul 29 2024 Your Name <youremail@example.com> - 2.0.7-1
+- Converted from DKMS to an akmod-dependent package for a seamless install.

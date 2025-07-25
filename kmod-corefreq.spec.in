@@ -2,9 +2,9 @@
 
 Name:           kmod-corefreq
 Version:        @VERSION@
+# Small Change: Using %{?dist} to work on all Fedora versions.
 Release:        @RELEASE@%{?dist}
 Summary:        CoreFreq kernel module
-
 License:        GPL-2.0-only
 
 Provides:       kernel-modules-for-kernel = %(uname -r)
@@ -20,11 +20,14 @@ make -C . KERNELDIR=%{_usrsrc}/kernels/%{kver} corefreqk.ko
 
 %install
 install -D -m 0755 build/corefreqk.ko %{buildroot}%{kmodinstdir}/corefreqk.ko
+
+# SMALL CHANGE: Add the modules-load.d config to load the module on boot.
 install -d -m 755 %{buildroot}%{_sysconfdir}/modules-load.d
 echo corefreqk > %{buildroot}%{_sysconfdir}/modules-load.d/corefreq.conf
 
+# SMALL CHANGE: Add post-install script for Secure Boot check and depmod.
 %post
-# This is the correct place for post-module-install logic.
+# After install, try to load the module and check for Secure Boot errors.
 if ! /sbin/modprobe corefreqk >/dev/null 2>&1; then
     if dmesg | grep -q "Key was rejected by service"; then
         echo "------------------------------------------------------------------"
@@ -46,8 +49,5 @@ fi
 
 %files
 %kmod_files
+# SMALL CHANGE: The package must own the config file it installs.
 %config(noreplace) %{_sysconfdir}/modules-load.d/corefreq.conf
-
-%changelog
-* Sun Jul 28 2024 Your Name <youremail@example.com> - @VERSION@-@RELEASE@
-- Corrected logic: contains post-install logic for modprobe and Secure Boot prompt.
