@@ -4,39 +4,34 @@
 Name:           corefreq
 Version:        2.0.7
 Release:        1%{?dist}
-Summary:        CPU monitoring and tuning software with kernel module support
+Summary:        User-space daemon and CLI for CoreFreq
 
 License:        GPL-2.0-only
 URL:            https://github.com/cyring/CoreFreq
 Source0:        %{url}/archive/refs/tags/%{version}.tar.gz
 
-# We only need systemd macros for the service, and gcc/make to build.
+# DKMS and kernel dependencies are REMOVED.
 BuildRequires:  gcc make systemd-rpm-macros
 
-# This is the key. It makes the install simple for the user.
-Requires:       akmod-corefreq
-
 %description
-CoreFreq is a CPU monitoring software with BIOS-like functionalities.
-This package provides the user-space tools and automatically installs the
-'akmod-corefreq' package to manage the kernel module.
+This package provides the user-space daemon (corefreqd) and the
+command-line interface (corefreq-cli). It is installed as a dependency
+of the akmod-corefreq package.
 
 %prep
 %autosetup -n %{srcname}-%{version}
 
 %build
-# Create the build directory, as required by the Makefile.
 mkdir -p build
-# Build ONLY the user-space tools.
 make %{?_smp_mflags} CFLAGS="%{optflags}" corefreqd corefreq-cli
 
 %install
-# Install ONLY the user-space files.
+# Install ONLY the user-space files. NO DKMS steps.
 install -D -m 0755 build/corefreqd %{buildroot}%{_sbindir}/corefreqd
 install -D -m 0755 build/corefreq-cli %{buildroot}%{_bindir}/corefreq-cli
 install -D -m 0644 corefreqd.service %{buildroot}%{_unitdir}/corefreqd.service
 
-# Use standard systemd macros for clean service management.
+# Use standard systemd macros. NO DKMS or modprobe logic.
 %post
 %systemd_post corefreqd.service
 
@@ -55,4 +50,4 @@ install -D -m 0644 corefreqd.service %{buildroot}%{_unitdir}/corefreqd.service
 
 %changelog
 * Sun Jul 28 2024 Your Name <youremail@example.com> - 2.0.7-1
-- Final version using the akmods framework for a clean, one-command install.
+- Corrected logic: Removed all DKMS functionality to serve as a dependency for akmods.

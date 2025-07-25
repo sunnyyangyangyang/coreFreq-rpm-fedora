@@ -16,7 +16,6 @@ Source0:        CoreFreq-@VERSION@.tar.gz
 %autosetup -n CoreFreq-@VERSION@
 
 %build
-# The KERNELDIR variable is provided by akmods.
 make -C . KERNELDIR=%{_usrsrc}/kernels/%{kver} corefreqk.ko
 
 %install
@@ -25,7 +24,7 @@ install -d -m 755 %{buildroot}%{_sysconfdir}/modules-load.d
 echo corefreqk > %{buildroot}%{_sysconfdir}/modules-load.d/corefreq.conf
 
 %post
-# After install, try to load the module and check for Secure Boot errors.
+# This is the correct place for post-module-install logic.
 if ! /sbin/modprobe corefreqk >/dev/null 2>&1; then
     if dmesg | grep -q "Key was rejected by service"; then
         echo "------------------------------------------------------------------"
@@ -37,8 +36,6 @@ if ! /sbin/modprobe corefreqk >/dev/null 2>&1; then
         echo "   (You will be asked to create a temporary password.)"
         echo "2. Reboot your computer."
         echo "3. At the blue 'MOK Manager' screen, enroll the key using the password."
-        echo
-        echo "After the reboot, the module will be trusted and will load automatically."
         echo "------------------------------------------------------------------"
     fi
 fi
@@ -53,4 +50,4 @@ fi
 
 %changelog
 * Sun Jul 28 2024 Your Name <youremail@example.com> - @VERSION@-@RELEASE@
-- Initial kmod template with Secure Boot prompt.
+- Corrected logic: contains post-install logic for modprobe and Secure Boot prompt.
