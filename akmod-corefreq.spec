@@ -12,12 +12,12 @@ URL:           https://github.com/cyring/CoreFreq
 Source0:       %{url}/archive/refs/tags/%{version}.tar.gz
 Source1:       kmod-%{kmod_name}.spec.in
 
-# This package requires the akmods service to function.
+# This package requires the akmods service and its dependencies.
 Requires:      akmods
 BuildRequires: kmod-devel
 BuildRequires: sed
 
-# IMPORTANT: No 'Requires: corefreq' here, as that would create a circular dependency.
+# IMPORTANT: No 'Requires: corefreq' here, to prevent a circular dependency.
 
 %description
 This package installs the CoreFreq kernel module source and template RPMs.
@@ -40,4 +40,4 @@ sed -i 's|@RELEASE@|%{release}|g' %{buildroot}%{_usrsrc}/akmods/kmod-%{kmod_name
 
 %changelog
 * Sun Jul 28 2024 Your Name <youremail@example.com> - 2.0.7-1
-- Initial akmods version, pulled in automatically by the corefreq package.
+- Initial akmods version.
