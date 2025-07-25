@@ -4,28 +4,63 @@ Name:           kmod-corefreq
 Version:        @VERSION@
 Release:        @RELEASE@%{?dist}
 Summary:        CoreFreq kernel module
+
 License:        GPL-2.0-only
 
-# This defines the virtual package for the kernel.
 Provides:       kernel-modules-for-kernel = %(uname -r)
-# The user-space tools depend on this name.
 Provides:       kmod-corefreq = @VERSION@
 
-# The source tarball is local to the build now.
 Source0:        CoreFreq-@VERSION@.tar.gz
 
 %prep
-# Unpack the source tarball. The -n flag is critical.
 %autosetup -n CoreFreq-@VERSION@
 
 %build
-# Build the kernel module from within the unpacked source directory.
+# The KERNELDIR variable is provided by akmods.
 make -C . KERNELDIR=%{_usrsrc}/kernels/%{kver} corefreqk.ko
 
 %install
 # Install the built .ko file to the final destination.
 install -D -m 0755 build/corefreqk.ko %{buildroot}%{kmodinstdir}/corefreqk.ko
 
+# Install the modules-load.d config file to load module on boot.
+install -d -m 755 %{buildroot}%{_sysconfdir}/modules-load.d
+echo corefreqk > %{buildroot}%{_sysconfdir}/modules-load.d/corefreq.conf
+
+%post
+# After install, try to load the module and check for Secure Boot errors.
+if ! /sbin/modprobe corefreqk >/dev/null 2>&1; then
+    if dmesg | grep -q "Key was rejected by service"; then
+        echo "------------------------------------------------------------------"
+        echo "ATTENTION: SECURE BOOT"
+        echo "The CoreFreq kernel module was built, but Secure Boot prevented it from loading."
+        echo
+        echo "To approve the key used by akmods, please follow these steps:"
+        # This path is correct for akmods, not the dkms path.
+        echo "1. Run this command: sudo mokutil --import /etc/pki/akmods/certs/public_key.der"
+        echo "   (You will be asked to create a temporary password.)"
+        echo "2. Reboot your computer."
+        echo "3. At the blue 'MOK Manager' screen, enroll the key using the password."
+        echo
+        echo "After the reboot, the module will be trusted and will load automatically."
+        echo "------------------------------------------------------------------"
+    fi
+fi
+
+# Run depmod to update module dependencies for this kernel.
+/sbin/depmod -a %{kver}
+
+%postun
+# Run depmod on uninstall as well.
+/sbin/depmod -a %{kver}
+
 %files
 # This macro finds and owns the .ko file.
 %kmod_files
+%config(noreplace) %{_sysconfdir}/modules-load.d/corefreq.conf
+
+%changelog
+* Sun Jul 28 2024 Your Name <youremail@example.com> - @VERSION@-@RELEASE@
+- Initial kmod template.
+- Added Secure Boot MOK enrollment instructions for akmods.
+- Added modules-load.d configuration.

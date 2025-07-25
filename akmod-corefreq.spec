@@ -9,18 +9,21 @@ Summary:       Akmod package for the %{kmod_name} kernel module
 License:       GPL-2.0-only
 URL:           https://github.com/cyring/CoreFreq
 
-Source0:       https://github.com/cyring/CoreFreq/archive/refs/tags/%{version}.tar.gz
+Source0:       %{url}/archive/refs/tags/%{version}.tar.gz
 Source1:       kmod-%{kmod_name}.spec.in
 
+# This package requires the akmods service to function.
 Requires:      akmods
-Requires:      corefreq = %{version}-%{release}
 BuildRequires: kmod-devel
 BuildRequires: sed
+
+# IMPORTANT: No 'Requires: corefreq' here, as that would create a circular dependency.
 
 %description
 This package installs the CoreFreq kernel module source and template RPMs.
 The akmods service will use these to build a kmod-corefreq package for your
-running kernel.
+running kernel. This package is automatically installed as a dependency of
+the main 'corefreq' package.
 
 %install
 mkdir -p %{buildroot}%{_usrsrc}/akmods/SOURCES
@@ -29,8 +32,6 @@ install -p -m 0644 %{SOURCE1} %{buildroot}%{_usrsrc}/akmods/kmod-%{kmod_name}.sp
 sed -i 's|@VERSION@|%{version}|g' %{buildroot}%{_usrsrc}/akmods/kmod-%{kmod_name}.spec
 sed -i 's|@RELEASE@|%{release}|g' %{buildroot}%{_usrsrc}/akmods/kmod-%{kmod_name}.spec
 
-# NO SCRIPTLETS HERE. They are unreliable during the transaction.
-
 %files
 %dir %{_usrsrc}/akmods
 %dir %{_usrsrc}/akmods/SOURCES
@@ -38,7 +39,5 @@ sed -i 's|@RELEASE@|%{release}|g' %{buildroot}%{_usrsrc}/akmods/kmod-%{kmod_name
 %{_usrsrc}/akmods/kmod-%{kmod_name}.spec
 
 %changelog
-* Thu Jul 25 2024 Your Name <youremail@example.com> - 2.0.7-14
-- Final implementation: Removed unreliable %%post scriptlet trigger.
-- The build is now triggered manually by the user post-install, or
-  automatically on the next kernel update, which is the robust way.
+* Sun Jul 28 2024 Your Name <youremail@example.com> - 2.0.7-1
+- Initial akmods version, pulled in automatically by the corefreq package.
