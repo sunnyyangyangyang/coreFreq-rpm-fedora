@@ -3,7 +3,7 @@
 
 Name:          akmod-%{kmod_name}
 Version:       2.0.7
-Release:       1.fc42
+Release:       1%{?dist}
 Summary:       Akmod package for the %{kmod_name} kernel module
 
 License:       GPL-2.0-only

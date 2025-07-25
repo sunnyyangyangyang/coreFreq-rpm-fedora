@@ -3,7 +3,7 @@
 
 Name:           corefreq
 Version:        2.0.7
-Release:        1.fc42
+Release:        1%{?dist}
 Summary:        CPU monitoring and tuning software with DKMS kernel module
 
 License:        GPL-2.0-only
@@ -81,6 +81,18 @@ fi
 systemctl daemon-reload >/dev/null 2>&1 || :
 systemctl enable --now corefreqd.service >/dev/null 2>&1 || :
 
+# Step 4: Verify the service status.
+echo "------------------------------------------------------------------"
+echo "Verifying service status..."
+if systemctl is-active --quiet corefreqd.service; then
+    echo "SUCCESS: The corefreqd service is now running."
+else
+    echo "NOTICE: The corefreqd service is not running."
+    echo "This is expected if the kernel module is not yet loaded (e.g., due to Secure Boot)."
+    echo "The service will start automatically on the next boot after the module loads."
+fi
+echo "You can check the status manually with: systemctl status corefreqd.service"
+echo "------------------------------------------------------------------"
 
 %preun
 systemctl disable --now corefreqd.service >/dev/null 2>&1 || :
