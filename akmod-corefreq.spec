@@ -28,8 +28,9 @@ running kernel.
 install -d %{buildroot}%{_usrsrc}/akmods/SOURCES
 install -d %{buildroot}%{_usrsrc}/akmods/
 
-# Install the source tarball (Source0) into the SOURCES directory.
-install -p -m 0644 %{SOURCE0} %{buildroot}%{_usrsrc}/akmods/SOURCES/
+# --- THIS IS THE CORRECTED LINE ---
+# Install Source0 and explicitly RENAME it to what the %files section expects.
+install -p -m 0644 %{SOURCE0} %{buildroot}%{_usrsrc}/akmods/SOURCES/CoreFreq-%{version}.tar.gz
 
 # Install the template spec (Source1) and replace the version placeholder.
 install -p -m 0644 %{SOURCE1} %{buildroot}%{_usrsrc}/akmods/kmod-%{kmod_name}.spec
@@ -43,4 +44,5 @@ sed -i 's/__VERSION__/%{version}/g' %{buildroot}%{_usrsrc}/akmods/kmod-%{kmod_na
 
 %changelog
 * Tue Jul 30 2024 sunnyyangyangyang <youremail@example.com> - 2.0.7-1
+- Fix file not found error by renaming source tarball on install.
 - Initial akmod package for COPR SCM build.
