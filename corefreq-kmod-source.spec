@@ -21,37 +21,38 @@ install -d -m 0755 %{buildroot}%{_usrsrc}/akmods/SOURCES/
 install -d -m 0755 %{buildroot}%{_usrsrc}/akmods/
 install -p -m 0644 %{SOURCE0} %{buildroot}%{_usrsrc}/akmods/SOURCES/
 
+# --- Create the kmod spec template with all '%' signs escaped as '%%' ---
 cat > %{buildroot}%{_usrsrc}/akmods/kmod-%{kmod_name}.spec << 'EOF'
-%global debug_package %{nil}
-%global kmod_name corefreq
+%%global debug_package %%{nil}
+%%global kmod_name corefreq
 
-Name:           kmod-%{kmod_name}
+Name:           kmod-%%{kmod_name}
 Version:        %{version}
-Release:        1%{?dist}
+Release:        1%%{?dist}
 Summary:        CoreFreq kernel module
 License:        GPL-2.0-only
 URL:            https://github.com/cyring/CoreFreq
-BuildRequires:  kernel-devel = %{kver}
+BuildRequires:  kernel-devel = %%{kver}
 BuildRequires:  gcc
 BuildRequires:  make
 
-%description
-This package provides the %{kmod_name} kernel module for kernel %{kver}.
+%%description
+This package provides the %%{kmod_name} kernel module for kernel %%{kver}.
 
-%prep
-%setup -q -n CoreFreq-%{version}
+%%prep
+%%setup -q -n CoreFreq-%{version}
 
-%build
-make %{?_smp_mflags} -C %{_builddir}/CoreFreq-%{version} KERNELDIR=%{_usrsrc}/kernels/%{kver} corefreqk.ko
+%%build
+make %%{?_smp_mflags} -C %%{_builddir}/CoreFreq-%{version} KERNELDIR=%%{_usrsrc}/kernels/%%{kver} corefreqk.ko
 
-%install
-install -D -m 0755 build/corefreqk.ko %{buildroot}%{kmodinstdir}/%{kmod_name}k.ko
-install -d -m 755 %{buildroot}%{_sysconfdir}/modules-load.d
-echo %{kmod_name}k > %{buildroot}%{_sysconfdir}/modules-load.d/%{kmod_name}.conf
+%%install
+install -D -m 0755 build/corefreqk.ko %%{buildroot}%%{kmodinstdir}/%%{kmod_name}k.ko
+install -d -m 755 %%{buildroot}%%{_sysconfdir}/modules-load.d
+echo %%{kmod_name}k > %%{buildroot}%%{_sysconfdir}/modules-load.d/%%{kmod_name}.conf
 
-%post
-/sbin/depmod -a %{kver}
-if ! /sbin/modprobe %{kmod_name}k >/dev/null 2>&1; then
+%%post
+/sbin/depmod -a %%{kver}
+if ! /sbin/modprobe %%{kmod_name}k >/dev/null 2>&1; then
     if dmesg | grep -q "Key was rejected by service"; then
         echo "------------------------------------------------------------------"
         echo "ATTENTION: SECURE BOOT"
@@ -62,17 +63,17 @@ if ! /sbin/modprobe %{kmod_name}k >/dev/null 2>&1; then
 fi
 systemctl try-restart corefreqd.service >/dev/null 2>&1 || :
 
-%preun
+%%preun
 if [ $1 -eq 0 ]; then
     systemctl stop corefreqd.service >/dev/null 2>&1 || :
 fi
 
-%postun
-/sbin/depmod -a %{kver}
+%%postun
+/sbin/depmod -a %%{kver}
 
-%files
-%kmod_files
-%config(noreplace) %{_sysconfdir}/modules-load.d/%{kmod_name}.conf
+%%files
+%%kmod_files
+%%config(noreplace) %%{_sysconfdir}/modules-load.d/%%{kmod_name}.conf
 EOF
 
 %preun

@@ -23,6 +23,7 @@ package to provide the required kernel module.
 %autosetup -n %{srcname}-%{version}
 
 %build
+mkdir -p build
 make %{?_smp_mflags} CFLAGS="%{optflags}" corefreqd corefreq-cli
 
 %install
