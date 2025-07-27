@@ -12,8 +12,10 @@ URL:            https://github.com/cyring/CoreFreq
 # The source tarball
 Source0:        https://github.com/cyring/CoreFreq/archive/v%{version}.tar.gz#/%{name}-%{version}.tar.gz
 
-# We build for a specific architecture because we are including compiled user-space tools.
-BuildArch:      x86_64
+# CORRECTED: Use ExclusiveArch instead of BuildArch for Copr compatibility.
+# This declares that the source is only compatible with x86_64 without
+# making the Source RPM (SRPM) arch-specific.
+ExclusiveArch:  x86_64
 
 # Dependencies needed to build the RPM itself
 BuildRequires:  make
@@ -34,18 +36,15 @@ kernel module for your current and future kernels, ensuring compatibility
 across kernel updates.
 
 # --- Prep Section ---
-# Unpack the source code.
 %prep
 %autosetup -p1 -n CoreFreq-%{version}
 
 # --- Build Section ---
-# Here we only build the user-space tools. The kernel module will be built by DKMS
-# on the user's machine.
+# Build the user-space tools. The kernel module will be built by DKMS on the user's machine.
 %build
 make %{?_smp_mflags} corefreqd corefreq-cli
 
 # --- Install Section ---
-# This section places all necessary files into the buildroot.
 %install
 # 1. Install the user-space binaries
 install -d -m 755 %{buildroot}%{_bindir}
@@ -58,11 +57,9 @@ install -m 644 corefreqd.service %{buildroot}%{_unitdir}/corefreqd.service
 
 # 3. Install the kernel module source code for DKMS
 install -d -m 755 %{buildroot}%{_usrsrc}/%{name}-%{version}
-# Copy the entire source tree
 cp -r ./* %{buildroot}%{_usrsrc}/%{name}-%{version}/
 
-# 4. Create a dkms.conf file on the fly. This is cleaner than patching the original.
-#    This tells DKMS how to build the module.
+# 4. Create a dkms.conf file on the fly.
 cat << EOF > %{buildroot}%{_usrsrc}/%{name}-%{version}/dkms.conf
 PACKAGE_NAME="corefreqk"
 PACKAGE_VERSION="%{version}"
@@ -74,77 +71,44 @@ AUTOINSTALL="yes"
 EOF
 
 # --- Scriptlets ---
-# These scripts run on the user's machine during installation/uninstallation.
-
 %post
-# This script runs after the package is installed.
-
-# 1. Add the module to DKMS, which will trigger the first build and install.
-echo "Adding CoreFreq to DKMS..."
 dkms add -m %{name} -v %{version}
-echo "Building CoreFreq module for kernel $(uname -r)..."
 dkms build -m %{name} -v %{version}
-echo "Installing CoreFreq module..."
 dkms install -m %{name} -v %{version}
 
-# 2. Enable and start the systemd service.
-echo "Reloading systemd and starting service..."
 %systemd_post corefreqd.service
+# Use a non-fatal start in case the module needs a MOK enrollment + reboot
 systemctl start corefreqd.service >/dev/null 2>&1 || :
 
-# 3. Handle Secure Boot. This is the standard, secure way for DKMS.
-#    We instruct the user to create their own key for DKMS to use.
 if [ -x /usr/bin/mokutil ] && mokutil --sb-state | grep -q "enabled"; then
     echo
     echo "----------------------------------------------------------------------"
     echo "ATTENTION: Secure Boot is enabled on your system."
+    echo "For DKMS to automatically sign modules, you must create and enroll"
+    echo "a personal Machine Owner Key (MOK)."
     echo
-    echo "For DKMS to automatically sign the CoreFreq module, you must create"
-    echo "a personal Machine Owner Key (MOK) and enroll it."
-    echo
-    echo "If you have NOT done this before, please perform the following steps:"
-    echo "1. Create a key for DKMS to use:"
-    echo "   sudo /usr/sbin/dkms-mok-key"
-    echo
-    echo "2. Enroll the new key. You will be asked to create a password:"
-    echo "   sudo mokutil --import /var/lib/dkms/mok.pub"
-    echo
-    echo "3. Reboot your system. The MOK Manager will launch."
-    echo "   Select 'Enroll MOK', 'Continue', and enter the password you just"
-    echo "   created to complete the enrollment."
-    echo
-    echo "Once this is done, DKMS will automatically sign the CoreFreq module"
-    echo "now and for all future kernel updates."
+    echo "If you have NOT done this before for DKMS, please see:"
+    echo "https://docs.fedoraproject.org/en-US/fedora/latest/system-administrators-guide/kernel-module-driver-configuration/Working_with_Kernel_Modules/#sect-generating-a-signing-key"
     echo "----------------------------------------------------------------------"
     echo
 fi
 
 %preun
-# This script runs before the package is uninstalled.
-
-# 1. Stop and disable the service.
 %systemd_preun corefreqd.service
 
-# 2. Remove the module from DKMS. This is the most critical step for clean removal.
-#    It removes the source, all built modules, and cleans up links.
-if [ -f /usr/sbin/dkms ]; then
-    echo "Removing CoreFreq from DKMS..."
+# Remove from DKMS before the files are deleted
+if [ "$1" -eq 0 ] ; then # This condition means "on final uninstallation"
     dkms remove -m %{name} -v %{version} --all >/dev/null 2>&1 || :
 fi
 
 %postun
-# Final systemd cleanup after uninstallation.
 %systemd_postun_with_restart corefreqd.service
 
-
 # --- Files Section ---
-# This section lists every single file and directory that belongs to the package.
-
 %files
 %license LICENSE
 %doc README.md
 %{_bindir}/corefreqd
 %{_bindir}/corefreq-cli
 %{_unitdir}/corefreqd.service
-# This is the directory containing the kernel module source code for DKMS
 %{_usrsrc}/%{name}-%{version}/
