@@ -32,6 +32,7 @@ After installation, the module will be loaded and the service will be enabled.
 %autosetup -n %{srcname}-%{version}
 
 %build
+mkdir -p build
 # Build only the user-space tools. The kernel module is handled by DKMS.
 make %{?_smp_mflags} CFLAGS="%{optflags}" corefreqd corefreq-cli
 
