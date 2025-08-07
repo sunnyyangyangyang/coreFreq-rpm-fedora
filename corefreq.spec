@@ -4,16 +4,18 @@
 
 Name:           corefreq
 Version:        2.0.8
-Release:        5%{?dist}
+Release:        6%{?dist}
 Summary:        CPU monitoring software with BIOS-like functionalities
 
 License:        GPL-2.0-or-later
 URL:            https://github.com/%{gh_owner}/%{gh_repo}
-# Corrected Source0: Use the exact tarball URL that does not include the 'v' in the tag.
+# Correct Source URL
 Source0:        %{url}/archive/refs/tags/%{version}.tar.gz
-Source1:        corefreq-honor-compiler-flags.patch
-Source2:        dkms.conf
-Source3:        corefreqd.service
+# Declare the patch using the standard Patch0 tag
+Patch0:         corefreq-honor-compiler-flags.patch
+# Declare other sources
+Source1:        dkms.conf
+Source2:        corefreqd.service
 
 ExclusiveArch:  x86_64 aarch64
 
@@ -61,16 +63,15 @@ Requires:       %{name}-server = %{version}-%{release}
 Contains corefreq-cli, a command-line interface for the daemon.
 
 %prep
-# Corrected %prep: The directory inside the tarball is still named with the 'v'.
-# So we must specify it with '-n'.
-%setup -q -n %{gh_repo}-v%{version}
+# Corrected %prep: Use the robust %autosetup macro.
+# -p1 applies all Patch files (like Patch0) correctly.
+# -n specifies the non-standard directory name inside the tarball (CoreFreq-v2.0.8).
+%autosetup -p1 -n %{gh_repo}-v%{version}
 
-# Manually apply the patch
-%patch -P 1 -p1
-
-# Manually copy the secondary sources
+# Manually copy the extra source files into the build directory.
+# This must be done after %autosetup has created the directory.
+cp %{SOURCE1} .
 cp %{SOURCE2} .
-cp %{SOURCE3} .
 
 %build
 # %make_build passes standard Fedora CFLAGS and LDFLAGS
@@ -81,7 +82,7 @@ cp %{SOURCE3} .
 install -Dm755 build/corefreqd %{buildroot}%{_bindir}/corefreqd
 install -Dm755 build/corefreq-cli %{buildroot}%{_bindir}/corefreq-cli
 
-# Install systemd service file
+# Install systemd service file (using the one we copied into the build dir)
 install -Dm644 corefreqd.service %{buildroot}%{_unitdir}/corefreqd.service
 
 # Install sources for DKMS
@@ -110,7 +111,7 @@ if command -v mokutil >/dev/null 2>&1 && mokutil --sb-state | grep -q enabled; t
     echo "--------------------------------------------------------------------------------"
     echo "ATTENTION: Secure Boot is enabled and the DKMS signing key is not yet enrolled."
     echo
-    echo "The system will now ask you to create a password for the MOK enrollment."
+    echo "The system may now ask you to create a password for the MOK enrollment."
     echo "Please enter a temporary password you can remember for the reboot."
     echo
     echo "1. On reboot, the blue 'MOK management' screen will appear."
@@ -120,7 +121,7 @@ if command -v mokutil >/dev/null 2>&1 && mokutil --sb-state | grep -q enabled; t
     echo
     echo "The CoreFreq kernel module will not load until this key is enrolled."
     echo "--------------------------------------------------------------------------------"
-    mokutil --import-key "$MOK_KEY" --root-pw
+    mokutil --import-key "$MOK_KEY" --root-pw || true
   fi
 fi
 
@@ -148,6 +149,14 @@ fi
 %exclude %{_usrsrc}/%{dkms_name}-%{version}/dkms.conf
 
 %changelog
+* Thu Aug 08 2025 Fedora Packager - 2.0.8-6
+- Corrected patch application by using standard Patch0 tag and robust %autosetup macro.
+- This fixes the 'No patch number 1' error in the COPR build environment.
+
+* Thu Aug 08 2025 Fedora Packager - 2.0.8-5
+- Corrected Source0 URL and %prep section to be compatible with COPR build system.
+- Changed %autosetup to manual %setup and %patch to handle non-standard tarball names.
+
 * Thu Aug 07 2025 Fedora Packager - 2.0.8-3
 - Hardened spec against build errors and improved Fedora version flexibility.
 - Modified compiler flags patch to use system defaults instead of suppressing warnings.
