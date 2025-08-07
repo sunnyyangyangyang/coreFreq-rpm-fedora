@@ -4,13 +4,13 @@
 
 Name:           corefreq
 Version:        2.0.8
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        CPU monitoring software with BIOS-like functionalities
 
 License:        GPL-2.0-or-later
 URL:            https://github.com/%{gh_owner}/%{gh_repo}
-Source0:        %{url}/archive/refs/tags/v%{version}.tar.gz#/%{gh_repo}-%{version}.tar.gz
-# Modified patch to cleanly remove upstream flags without suppressing all warnings
+# Corrected Source0: Removed the "#" fragment which fails in COPR's curl helper.
+Source0:        %{url}/archive/refs/tags/v%{version}.tar.gz
 Source1:        corefreq-honor-compiler-flags.patch
 Source2:        dkms.conf
 Source3:        corefreqd.service
