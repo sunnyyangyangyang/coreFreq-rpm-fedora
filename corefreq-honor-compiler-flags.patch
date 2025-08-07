@@ -1,0 +1,11 @@
+--- a/Makefile
++++ b/Makefile
+@@ -7,7 +7,7 @@
+ COREFREQ_REV = 1
+ HW = $(shell uname -m)
+ CC ?= cc
+-WARNING ?= -Wall -Wfatal-errors
++WARNING ?=
+ SYMLINK ?= ln -s
+ INSTALL ?= install
+ DEPMOD ?= depmod

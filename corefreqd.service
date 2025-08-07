@@ -1,0 +1,20 @@
+[Unit]
+Description=CoreFreq Daemon
+After=systemd-modules-load.service
+
+[Service]
+# Systemd hardening options from the openSUSE package
+ProtectSystem=full
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+
+Type=simple
+ExecStartPre=-/usr/sbin/modprobe corefreqk
+ExecStart=/usr/bin/corefreqd -q
+ExecStop=/bin/kill -QUIT $MAINPID
+ExecStopPost=-/usr/sbin/modprobe -r corefreqk
+SuccessExitStatus=SIGQUIT SIGUSR1 SIGTERM
+
+[Install]
+WantedBy=multi-user.target

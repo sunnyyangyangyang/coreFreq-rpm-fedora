@@ -1,114 +1,154 @@
-%global cf_major 2
-%global cf_minor 0
-%global cf_rev 8
+%global gh_owner cyring
+%global gh_repo CoreFreq
+%global dkms_name corefreq
 
 Name:           corefreq
-Version:        %{cf_major}.%{cf_minor}.%{cf_rev}
-Release:        1%{?dist}
-Summary:        CoreFreq CPU monitor with DKMS for automatic kernel module builds
-License:        GPL-2.0
-URL:            https://github.com/cyring/CoreFreq
+Version:        2.0.8
+Release:        3%{?dist}
+Summary:        CPU monitoring software with BIOS-like functionalities
 
-# The source tarball
-Source0:        https://github.com/cyring/CoreFreq/archive/v%{version}.tar.gz#/%{name}-%{version}.tar.gz
+License:        GPL-2.0-or-later
+URL:            https://github.com/%{gh_owner}/%{gh_repo}
+Source0:        %{url}/archive/refs/tags/v%{version}.tar.gz#/%{gh_repo}-%{version}.tar.gz
+# Modified patch to cleanly remove upstream flags without suppressing all warnings
+Source1:        corefreq-honor-compiler-flags.patch
+Source2:        dkms.conf
+Source3:        corefreqd.service
 
-# CORRECTED: Use ExclusiveArch instead of BuildArch for Copr compatibility.
-# This declares that the source is only compatible with x86_64 without
-# making the Source RPM (SRPM) arch-specific.
-ExclusiveArch:  x86_64
+ExclusiveArch:  x86_64 aarch64
 
-# Dependencies needed to build the RPM itself
-BuildRequires:  make
 BuildRequires:  gcc
+BuildRequires:  make
+BuildRequires:  sed
+BuildRequires:  kernel-devel
+BuildRequires:  dkms
+BuildRequires:  systemd-rpm-macros
 
-# Dependencies required on the end-user's system to install and run the RPM
-Requires:       dkms
-Requires:       kernel-devel
-Requires:       systemd
-# For Secure Boot MOK management
-Requires:       mokutil
-Requires:       openssl
+# Metapackage for convenience
+Requires:       %{name}-client%{?_isa} = %{version}-%{release}
+Requires:       %{name}-server%{?_isa} = %{version}-%{release}
 
 %description
-CoreFreq is a CPU monitoring software with BIOS like functionalities.
-This package uses DKMS to automatically build and install the 'corefreqk'
-kernel module for your current and future kernels, ensuring compatibility
-across kernel updates.
+CoreFreq is a CPU monitoring software with BIOS-like functionalities.
+This is a metapackage that installs all CoreFreq components.
 
-# --- Prep Section ---
+%package dkms
+Summary:        DKMS driver sources for CoreFreq
+Requires:       dkms
+Requires:       kernel-devel
+Requires:       mokutil
+Requires:       openssl
+Provides:       %{name}-kmod = %{version}-%{release}
+
+%description dkms
+This package contains the source for the corefreqk kernel module and configures
+DKMS to build and install it. It supports signing for Secure Boot.
+
+%package server
+Summary:        CoreFreq server daemon
+Requires:       %{name}-dkms = %{version}-%{release}
+Requires:       systemd
+%{?systemd_requires}
+
+%description server
+Contains the corefreqd daemon and systemd service.
+
+%package client
+Summary:        CoreFreq command-line client
+Requires:       %{name}-server = %{version}-%{release}
+
+%description client
+Contains corefreq-cli, a command-line interface for the daemon.
+
 %prep
-%autosetup -p1 -n CoreFreq-%{version}
+%autosetup -n %{gh_repo}-%{version} -p1 -N
+cp %{SOURCE2} dkms.conf
+cp %{SOURCE3} corefreqd.service
 
-# --- Build Section ---
-# Build the user-space tools. The kernel module will be built by DKMS on the user's machine.
 %build
-make %{?_smp_mflags} corefreqd corefreq-cli
+# %make_build passes standard Fedora CFLAGS and LDFLAGS
+%make_build corefreqd corefreq-cli
 
-# --- Install Section ---
 %install
-# 1. Install the user-space binaries
-install -d -m 755 %{buildroot}%{_bindir}
-install -m 755 build/corefreqd %{buildroot}%{_bindir}/corefreqd
-install -m 755 build/corefreq-cli %{buildroot}%{_bindir}/corefreq-cli
+# Install userspace binaries
+install -Dm755 build/corefreqd %{buildroot}%{_bindir}/corefreqd
+install -Dm755 build/corefreq-cli %{buildroot}%{_bindir}/corefreq-cli
 
-# 2. Install the systemd service file
-install -d -m 755 %{buildroot}%{_unitdir}
-install -m 644 corefreqd.service %{buildroot}%{_unitdir}/corefreqd.service
+# Install systemd service file
+install -Dm644 corefreqd.service %{buildroot}%{_unitdir}/corefreqd.service
 
-# 3. Install the kernel module source code for DKMS
-install -d -m 755 %{buildroot}%{_usrsrc}/%{name}-%{version}
-cp -r ./* %{buildroot}%{_usrsrc}/%{name}-%{version}/
+# Install sources for DKMS
+install -d %{buildroot}%{_usrsrc}/%{dkms_name}-%{version}/
+cp -a . %{buildroot}%{_usrsrc}/%{dkms_name}-%{version}/
 
-# 4. Create a dkms.conf file on the fly.
-cat << EOF > %{buildroot}%{_usrsrc}/%{name}-%{version}/dkms.conf
-PACKAGE_NAME="corefreqk"
-PACKAGE_VERSION="%{version}"
-BUILT_MODULE_NAME[0]="corefreqk"
-DEST_MODULE_LOCATION[0]="/extra"
-MAKE[0]="make -C . KERNELDIR=/lib/modules/\${kernelver}/build"
-CLEAN="make clean"
-AUTOINSTALL="yes"
-EOF
+# Substitute the package version in dkms.conf and install it
+sed -i 's/@VERSION@/%{version}/' dkms.conf
+install -Dm644 dkms.conf %{buildroot}%{_usrsrc}/%{dkms_name}-%{version}/dkms.conf
 
-# --- Scriptlets ---
-%post
-dkms add -m %{name} -v %{version}
-dkms build -m %{name} -v %{version}
-dkms install -m %{name} -v %{version}
+%post dkms
+dkms add -m %{dkms_name} -v %{version} --rpm_safe_upgrade
+dkms build -m %{dkms_name} -v %{version}
+dkms install -m %{dkms_name} -v %{version} --rpm_safe_upgrade
 
-%systemd_post corefreqd.service
-# Use a non-fatal start in case the module needs a MOK enrollment + reboot
-systemctl start corefreqd.service >/dev/null 2>&1 || :
-
-if [ -x /usr/bin/mokutil ] && mokutil --sb-state | grep -q "enabled"; then
-    echo
-    echo "----------------------------------------------------------------------"
-    echo "ATTENTION: Secure Boot is enabled on your system."
-    echo "For DKMS to automatically sign modules, you must create and enroll"
-    echo "a personal Machine Owner Key (MOK)."
-    echo
-    echo "If you have NOT done this before for DKMS, please see:"
-    echo "https://docs.fedoraproject.org/en-US/fedora/latest/system-administrators-guide/kernel-module-driver-configuration/Working_with_Kernel_Modules/#sect-generating-a-signing-key"
-    echo "----------------------------------------------------------------------"
-    echo
+%preun dkms
+if [ $1 -eq 0 ]; then
+  dkms remove -m %{dkms_name} -v %{version} --all
 fi
 
-%preun
+%posttrans dkms
+# Instruct user to enroll the DKMS signing key (MOK) if Secure Boot is enabled.
+if command -v mokutil >/dev/null 2>&1 && mokutil --sb-state | grep -q enabled; then
+  MOK_KEY="/var/lib/dkms/mok.pub"
+  if [ -f "$MOK_KEY" ] && ! mokutil --test-key "$MOK_KEY" >/dev/null 2>&1; then
+    echo "--------------------------------------------------------------------------------"
+    echo "ATTENTION: Secure Boot is enabled and the DKMS signing key is not yet enrolled."
+    echo
+    echo "The system will now ask you to create a password for the MOK enrollment."
+    echo "Please enter a temporary password you can remember for the reboot."
+    echo
+    echo "1. On reboot, the blue 'MOK management' screen will appear."
+    echo "2. Select 'Enroll MOK' -> 'Continue'."
+    echo "3. When asked to 'Enroll the key(s)?', select 'Yes'."
+    echo "4. Enter the password you just created."
+    echo
+    echo "The CoreFreq kernel module will not load until this key is enrolled."
+    echo "--------------------------------------------------------------------------------"
+    mokutil --import-key "$MOK_KEY" --root-pw
+  fi
+fi
+
+%post server
+# Use modern macro to handle service enable/start on install and restart on upgrade.
+%systemd_post_with_restart corefreqd.service
+
+%preun server
 %systemd_preun corefreqd.service
 
-# Remove from DKMS before the files are deleted
-if [ "$1" -eq 0 ] ; then # This condition means "on final uninstallation"
-    dkms remove -m %{name} -v %{version} --all >/dev/null 2>&1 || :
-fi
-
-%postun
-%systemd_postun_with_restart corefreqd.service
-
-# --- Files Section ---
-%files
+%files client
 %license LICENSE
 %doc README.md
-%{_bindir}/corefreqd
 %{_bindir}/corefreq-cli
+
+%files server
+%{_bindir}/corefreqd
 %{_unitdir}/corefreqd.service
-%{_usrsrc}/%{name}-%{version}/
+
+%files dkms
+%{_usrsrc}/%{dkms_name}-%{version}/
+%exclude %{_usrsrc}/%{dkms_name}-%{version}/build/corefreqd
+%exclude %{_usrsrc}/%{dkms_name}-%{version}/build/corefreq-cli
+%exclude %{_usrsrc}/%{dkms_name}-%{version}/corefreqd.service
+%exclude %{_usrsrc}/%{dkms_name}-%{version}/dkms.conf
+
+%changelog
+* Thu Aug 07 2025 Fedora Packager - 2.0.8-3
+- Hardened spec against build errors and improved Fedora version flexibility.
+- Modified compiler flags patch to use system defaults instead of suppressing warnings.
+- Refined systemd and Secure Boot MOK enrollment logic for better user experience.
+
+* Thu Aug 07 2025 Fedora Packager - 2.0.8-2
+- Enhanced spec with fully automated systemd, DKMS, and Secure Boot MOK enrollment logic.
+- Added user prompts for MOK enrollment and ensured clean uninstallation.
+
+* Thu Aug 07 2025 Fedora Packager - 2.0.8-1
+- Initial Fedora package combining openSUSE spec and Arch PKGBUILD with DKMS.
