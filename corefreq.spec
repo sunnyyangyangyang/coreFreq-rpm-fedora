@@ -4,13 +4,13 @@
 
 Name:           corefreq
 Version:        2.0.8
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        CPU monitoring software with BIOS-like functionalities
 
 License:        GPL-2.0-or-later
 URL:            https://github.com/%{gh_owner}/%{gh_repo}
-# Corrected Source0: Removed the "#" fragment which fails in COPR's curl helper.
-Source0:        %{url}/archive/refs/tags/v%{version}.tar.gz
+# Corrected Source0: Use the exact tarball URL that does not include the 'v' in the tag.
+Source0:        %{url}/archive/refs/tags/%{version}.tar.gz
 Source1:        corefreq-honor-compiler-flags.patch
 Source2:        dkms.conf
 Source3:        corefreqd.service
@@ -61,9 +61,16 @@ Requires:       %{name}-server = %{version}-%{release}
 Contains corefreq-cli, a command-line interface for the daemon.
 
 %prep
-%autosetup -n %{gh_repo}-%{version} -p1 -N
-cp %{SOURCE2} dkms.conf
-cp %{SOURCE3} corefreqd.service
+# Corrected %prep: The directory inside the tarball is still named with the 'v'.
+# So we must specify it with '-n'.
+%setup -q -n %{gh_repo}-v%{version}
+
+# Manually apply the patch
+%patch -P 1 -p1
+
+# Manually copy the secondary sources
+cp %{SOURCE2} .
+cp %{SOURCE3} .
 
 %build
 # %make_build passes standard Fedora CFLAGS and LDFLAGS
