@@ -4,7 +4,7 @@
 
 Name:           corefreq
 Version:        2.0.8
-Release:        1.fc42
+Release:        1%{?dist}
 Summary:        CPU monitoring and tuning software with DKMS kernel module
 
 License:        GPL-2.0-only
