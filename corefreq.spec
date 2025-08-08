@@ -1,8 +1,9 @@
+
 %global debug_package %{nil}
 %global srcname CoreFreq
 
 Name:           corefreq
-Version:        2.0.7
+Version:        2.0.8
 Release:        1.fc42
 Summary:        CPU monitoring and tuning software with DKMS kernel module
 
