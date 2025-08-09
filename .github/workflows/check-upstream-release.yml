@@ -1,0 +1,64 @@
+name: Check for Upstream Release and Update Spec
+
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+  # Runs automatically every day at 03:33 UTC
+  schedule:
+    - cron: '33 3 * * *'
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+
+    # Grant permissions for the workflow to read repository contents and write commits
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get latest upstream release version
+        id: upstream
+        run: |
+          # Use the GitHub API to get the latest release from the upstream repo
+          # Use jq to parse the JSON and get the tag_name
+          # Use sed to remove any leading "v" from the tag (e.g., v2.0.9 -> 2.0.9)
+          LATEST_TAG=$(curl -s "https://api.github.com/repos/cyring/CoreFreq/releases/latest" | jq -r .tag_name | sed 's/^v//')
+          echo "Latest upstream version is: ${LATEST_TAG}"
+          echo "version=${LATEST_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Get current spec version
+        id: spec
+        run: |
+          # Grep the Version line from the spec file and extract the version number
+          CURRENT_VERSION=$(grep '^Version:' corefreq.spec | awk '{print $2}')
+          echo "Current spec version is: ${CURRENT_VERSION}"
+          echo "version=${CURRENT_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Compare versions and update if necessary
+        if: steps.upstream.outputs.version != steps.spec.outputs.version
+        run: |
+          echo "New version found! Updating spec file..."
+          
+          # Use sed to replace the old version with the new one.
+          # This command is robust and keeps the original formatting/whitespace.
+          sed -i "s/^\(Version:[\t ]\+\).*/\1${{ steps.upstream.outputs.version }}/" corefreq.spec
+          
+          echo "Spec file updated. Committing changes..."
+          
+          # Configure git with a user name and email for the commit
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          # Add the changed file, commit, and push
+          git add corefreq.spec
+          git commit -m "chore(release): Bump version to ${{ steps.upstream.outputs.version }}"
+          git push
+          
+      - name: Report no changes
+        if: steps.upstream.outputs.version == steps.spec.outputs.version
+        run: |
+          echo "No new version found. Current version is up-to-date."
