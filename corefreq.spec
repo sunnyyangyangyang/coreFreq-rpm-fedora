@@ -4,7 +4,7 @@
 
 Name:           corefreq
 Version:        2.0.8
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        CPU monitoring and tuning software with DKMS kernel module
 
 License:        GPL-2.0-only
@@ -38,6 +38,7 @@ cat > %{buildroot}%{dkms_source_dir}/dkms.conf << 'DKMS_EOF'
 PACKAGE_NAME="%{name}"
 PACKAGE_VERSION="%{version}"
 MAKE[0]="make -C . all"
+CLEAN="make clean"
 BUILT_MODULE_NAME[0]="corefreqk"
 BUILT_MODULE_LOCATION[0]="build/"
 DEST_MODULE_LOCATION[0]="/extra"
@@ -101,6 +102,9 @@ fi
 %config(noreplace) %{_sysconfdir}/modules-load.d/%{name}.conf
 
 %changelog
-* Fri Jul 26 2024 Your Name <youremail@example.com> - 2.0.7-15
+* Thu Aug 21 2025 Sunny Yang <yxh9956@gmail.com> - 2.0.8-2
+- Add CLEAN="make clean" to dkms.conf to ensure robust module rebuilds and prevent potential "Exec format error" on kernel updates.
+
+* Sun Aug 03 2025 Sunny Yang <yxh9956@gmail.com> - 2.0.7-1
 - Added user-friendly prompt for MOK enrollment on Secure Boot systems.
 - Final polished version.
