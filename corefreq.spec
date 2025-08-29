@@ -1,110 +1,100 @@
-
-%global debug_package %{nil}
-%global srcname CoreFreq
+%global corefreq_version 2.0.8
 
 Name:           corefreq
-Version:        null
-Release:        2%{?dist}
-Summary:        CPU monitoring and tuning software with DKMS kernel module
+Version:        %{corefreq_version}
+Release:        1%{?dist}
+Summary:        CPU monitoring software with DKMS kernel module
 
 License:        GPL-2.0-only
 URL:            https://github.com/cyring/CoreFreq
+Source0:        %{url}/archive/v%{version}/%{name}-%{version}.tar.gz
+Source1:        corefreqd.service
+Patch0:         dkms.conf.patch
 
-Source0:        %{url}/archive/refs/tags/%{version}.tar.gz
-
-BuildRequires:  gcc make kernel-devel dkms kmod systemd
-Requires:       dkms kernel-devel
+BuildRequires:  gcc make kernel-devel dkms kmod systemd-rpm-macros patch
+BuildRequires:  openssl mokutil
+Requires:       dkms kernel-devel openssl mokutil
 
 %description
-CoreFreq is a CPU monitoring software with BIOS-like functionalities.
+CoreFreq is a CPU monitoring software designed for 64-bit Processors.
 This package provides the user-space tools and the DKMS source for the
-'corefreqk' kernel module, which will be automatically built, loaded, and started.
+'corefreqk' kernel module, which will be automatically built, signed, and loaded.
 
 %prep
-%autosetup -n %{srcname}-%{version}
+%autosetup -n CoreFreq-%{version} -p1
+%patch -p1
+sed -i 's/@RPM_VERSION@/%{version}/' dkms.conf
 
 %build
-mkdir -p build
-make %{?_smp_mflags} CFLAGS="%{optflags}" corefreqd corefreq-cli
+# The default target 'all' builds the binaries and the .ko stub
+%make_build
 
 %install
-install -D -m 0755 build/corefreqd %{buildroot}%{_sbindir}/corefreqd
+# --- 最终修正: 手动安装文件，绝不使用 'make install' ---
+# 1. 安装用户空间程序 (它们在 'build' 子目录中)
+install -D -m 0755 build/corefreqd %{buildroot}%{_bindir}/corefreqd
 install -D -m 0755 build/corefreq-cli %{buildroot}%{_bindir}/corefreq-cli
-install -D -m 0644 corefreqd.service %{buildroot}%{_unitdir}/corefreqd.service
+
+# 2. 安装我们自己提供的健壮的 service 文件
+install -D -m 0644 %{SOURCE1} %{buildroot}%{_unitdir}/corefreqd.service
+
+# 3. 设置 DKMS 源码目录
 %global dkms_source_dir %{_usrsrc}/%{name}-%{version}
 install -d -m 755 %{buildroot}%{dkms_source_dir}
 cp -a . %{buildroot}%{dkms_source_dir}/
-cat > %{buildroot}%{dkms_source_dir}/dkms.conf << 'DKMS_EOF'
-PACKAGE_NAME="%{name}"
-PACKAGE_VERSION="%{version}"
-MAKE[0]="make -C . all"
-CLEAN="make clean"
-BUILT_MODULE_NAME[0]="corefreqk"
-BUILT_MODULE_LOCATION[0]="build/"
-DEST_MODULE_LOCATION[0]="/extra"
-AUTOINSTALL="yes"
-DKMS_EOF
-install -d -m 755 %{buildroot}%{_sysconfdir}/modules-load.d
-echo corefreqk > %{buildroot}%{_sysconfdir}/modules-load.d/%{name}.conf
-
 
 %post
-# Step 1: Build the kernel module.
+# --- NVIDIA 级全自动签名脚本 (无需改动) ---
+MOK_KEY_DIR="/etc/pki/corefreq"
+MOK_PRIV_KEY="${MOK_KEY_DIR}/private_key.priv"
+MOK_PUB_KEY="${MOK_KEY_DIR}/public_key.der"
+if [ ! -f "${MOK_PRIV_KEY}" ]; then
+    echo "--- Secure Boot key not found. Generating a new key for CoreFreq ---"
+    mkdir -p "${MOK_KEY_DIR}"
+    openssl req -new -x509 -newkey rsa:2048 -keyout "${MOK_PRIV_KEY}" -outform DER -out "${MOK_PUB_KEY}" -nodes -days 36500 -subj "/CN=CoreFreq DKMS Signing Key/" >/dev/null 2>&1
+    echo "----------------------------------------------------------------------"
+    echo "ATTENTION: SECURE BOOT FIRST-TIME SETUP"
+    echo "A new key has been generated. You must now enroll it into your UEFI."
+    echo "1. Run:   sudo mokutil --import ${MOK_PUB_KEY}"
+    echo "   (You will be asked to create a password for this one-time action.)"
+    echo "2. Reboot your computer and follow the prompts at the blue screen."
+    echo "----------------------------------------------------------------------"
+fi
+if dkms status -m %{name} -v %{version} | grep -q installed; then
+    dkms remove -m %{name} -v %{version} --all >/dev/null 2>&1 || :
+fi
 dkms add -m %{name} -v %{version} >/dev/null 2>&1 || :
 dkms autoinstall >/dev/null 2>&1 || :
-
-# Step 2: Try to load the module and check for Secure Boot errors.
-if ! /sbin/modprobe corefreqk >/dev/null 2>&1; then
-    # The modprobe failed. Check dmesg to see if it was a key rejection.
-    if dmesg | grep -q "Key was rejected by service"; then
-        # It was! Print a helpful message for the user.
-        echo "------------------------------------------------------------------"
-        echo "ATTENTION: SECURE BOOT"
-        echo "The CoreFreq kernel module was built and signed successfully, but"
-        echo "your system's Secure Boot prevented it from loading."
-        echo
-        echo "This is normal for the first installation of a custom module."
-        echo
-        echo "To approve the key, please follow these steps:"
-        echo "1. Run this command: sudo mokutil --import /var/lib/dkms/mok.pub"
-        echo "   (You will be asked to create a temporary password.)"
-        echo "2. Reboot your computer."
-        echo "3. At the blue 'MOK Manager' screen that appears on boot,"
-        echo "   select 'Enroll MOK' and follow the prompts, entering the"
-        echo "   password you created."
-        echo
-        echo "After the reboot, the module will be trusted and will load automatically."
-        echo "------------------------------------------------------------------"
-    fi
+CURRENT_KERNEL=$(ls -t /lib/modules | head -n1)
+MODULE_PATH="/lib/modules/${CURRENT_KERNEL}/extra/corefreqk.ko"
+if [ -f "${MOK_PRIV_KEY}" ] && [ -f "${MODULE_PATH}" ]; then
+    echo "--- Signing the CoreFreq module for kernel ${CURRENT_KERNEL} ---"
+    /usr/src/kernels/${CURRENT_KERNEL}/scripts/sign-file sha256 "${MOK_PRIV_KEY}" "${MOK_PUB_KEY}" "${MODULE_PATH}"
 fi
-
-# Step 3: Enable and start the daemon.
-# It will only succeed if the module is loaded.
-systemctl daemon-reload >/dev/null 2>&1 || :
-systemctl enable --now corefreqd.service >/dev/null 2>&1 || :
-
+%systemd_postun_with_restart corefreqd.service
 
 %preun
-systemctl disable --now corefreqd.service >/dev/null 2>&1 || :
-/sbin/rmmod corefreqk >/dev/null 2>&1 || :
+%systemd_preun corefreqd.service
 if [ $1 -eq 0 ]; then
-  dkms remove -m %{name} -v %{version} --all >/dev/null 2>&1 || :
+    /sbin/rmmod corefreqk >/dev/null 2>&1 || :
+    dkms remove -m %{name} -v %{version} --all >/dev/null 2>&1 || :
 fi
 
+%postun
+%systemd_postun_with_restart corefreqd.service
 
 %files
-%doc README.md
 %license LICENSE
-%{_sbindir}/corefreqd
+%doc README.md
 %{_bindir}/corefreq-cli
+%{_bindir}/corefreqd
 %{_unitdir}/corefreqd.service
 %{_usrsrc}/%{name}-%{version}/
-%config(noreplace) %{_sysconfdir}/modules-load.d/%{name}.conf
 
 %changelog
-* Thu Aug 21 2025 Sunny Yang <yxh9956@gmail.com> - 2.0.8-2
-- Add CLEAN="make clean" to dkms.conf to ensure robust module rebuilds and prevent potential "Exec format error" on kernel updates.
-
-* Sun Aug 03 2025 Sunny Yang <yxh9956@gmail.com> - 2.0.7-1
-- Added user-friendly prompt for MOK enrollment on Secure Boot systems.
-- Final polished version.
+* Fri Aug 29 2025 Sunny Yang <yxh9956@gmail.com> - 2.0.8-1
+- Final release for Copr, validated against upstream Makefile.
+- Uses manual install to avoid 'make install' side effects, which is correct for DKMS.
+- Implements NVIDIA-style, fully automatic key generation and signing for Secure Boot.
+- Uses a patch file for a clean, RPM-friendly dkms.conf.
+- Ships a robust, custom systemd service file for reliability.

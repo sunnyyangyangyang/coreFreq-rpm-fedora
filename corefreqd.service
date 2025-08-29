@@ -1,0 +1,24 @@
+[Unit]
+Description=CoreFreq Daemon
+# Ensure the module can be loaded, which might require basic system services to be up.
+After=systemd-modules-load.service
+
+[Service]
+# Standard slice for system services on Fedora/RHEL based systems
+Slice=system.slice
+Type=simple
+
+# Crucial Step: Explicitly load the kernel module before starting the daemon.
+# This is more reliable than relying on modules-load.d alone.
+ExecStartPre=/sbin/modprobe corefreqk
+
+# Start the daemon in quiet mode, suitable for a background service.
+# The path /usr/bin/corefreqd matches what our spec file installs.
+ExecStart=/usr/bin/corefreqd -q
+
+# Good Practice: Unload the kernel module after the daemon stops.
+# The '-' prefix tells systemd to ignore errors if the module is already unloaded.
+ExecStopPost=-/sbin/modprobe -r corefreqk
+
+[Install]
+WantedBy=multi-user.target
