@@ -6,7 +6,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        5%{?dist}
+Release:        6%{?dist}
 Summary:        CPU monitoring software with DKMS kernel module
 
 License:        GPL-2.0-only
@@ -73,8 +73,34 @@ fi
 dkms add -m %{name} -v %{version} >/dev/null 2>&1 || :
 dkms autoinstall -m %{name} -v %{version} >/dev/null 2>&1 || :
 
+# Load the kernel module
 /sbin/modprobe corefreqk >/dev/null 2>&1 || :
+
+# Enable and start the systemd service
 %systemd_post corefreqd.service
+systemctl enable corefreqd.service >/dev/null 2>&1 || :
+systemctl start corefreqd.service >/dev/null 2>&1 || :
+
+# Give user immediate feedback
+sleep 1
+if systemctl is-active --quiet corefreqd.service; then
+    echo "----------------------------------------------------------------------"
+    echo "CoreFreq daemon started successfully!"
+    echo "You can now use: corefreq-cli -Oa -t frequency"
+    echo "----------------------------------------------------------------------"
+else
+    echo "----------------------------------------------------------------------"
+    echo "Note: CoreFreq daemon may need manual start after MOK enrollment:"
+    echo "sudo systemctl start corefreqd.service"
+    echo "----------------------------------------------------------------------"
+fi
+
+%preun
+%systemd_preun corefreqd.service
+if [ $1 -eq 0 ]; then # Final uninstall
+    /sbin/rmmod corefreqk >/dev/null 2>&1 || :
+    dkms remove -m %{name} -v %{version} --all >/dev/null 2>&1 || :
+fi
 
 %postun
 %systemd_postun_with_restart corefreqd.service
@@ -86,8 +112,8 @@ dkms autoinstall -m %{name} -v %{version} >/dev/null 2>&1 || :
 %{_bindir}/corefreqd
 %{_unitdir}/corefreqd.service
 %{_usrsrc}/%{name}-%{version}/
-# --- We don't list the conf hook in %files ---
-# It is created and removed by scripts, not owned by the package. This is safer.
 
 %changelog
-# ...
+* Thu Aug 29 2025 - Release 6
+- Added automatic service startup after installation
+- Fixed daemon connection issues
