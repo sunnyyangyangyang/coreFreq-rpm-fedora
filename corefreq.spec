@@ -11,7 +11,7 @@ Source0:        %{url}/archive/refs/tags/%{version}.tar.gz#/%{name}-%{version}.t
 Source1:        corefreqd.service
 Source2:        dkms.conf
 
-BuildRequires:  gcc make kernel-devel dkms kmod system-rpm-macros
+BuildRequires:  gcc make kernel-devel dkms kmod systemd-rpm-macros
 BuildRequires:  openssl mokutil
 Requires:       dkms kernel-devel openssl mokutil
 
