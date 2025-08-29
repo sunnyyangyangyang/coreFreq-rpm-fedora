@@ -11,6 +11,7 @@ URL:            https://github.com/cyring/CoreFreq
 Source0:        %{url}/archive/refs/tags/%{version}.tar.gz#/%{name}-%{version}.tar.gz
 # Source1 is our robust service file
 Source1:        corefreqd.service
+# Source2 is our complete dkms.conf file
 Source2:        dkms.conf
 
 BuildRequires:  gcc make kernel-devel dkms kmod systemd-rpm-macros
@@ -25,13 +26,16 @@ This package provides the user-space tools and the DKMS source for the
 %prep
 %autosetup -n CoreFreq-%{version} -p1
 
-
+# Copy our complete dkms.conf file into the build directory
 cp %{SOURCE2} .
 
+# Replace the version placeholder within it
 sed -i 's/@RPM_VERSION@/%{version}/' dkms.conf
 
 %build
-%make_build
+# --- FINAL FIX ---
+# Do NOT build the kernel module here. Only build the user-space applications.
+make %{?_smp_mflags} corefreqd corefreq-cli
 
 %install
 # Manually install files, avoiding 'make install' to prevent packaging the .ko file
@@ -48,6 +52,7 @@ install -d -m 755 %{buildroot}%{dkms_source_dir}
 cp -a . %{buildroot}%{dkms_source_dir}/
 
 %post
+# NVIDIA-style fully automatic Secure Boot handling
 MOK_KEY_DIR="/etc/pki/corefreq"
 MOK_PRIV_KEY="${MOK_KEY_DIR}/private_key.priv"
 MOK_PUB_KEY="${MOK_KEY_DIR}/public_key.der"
@@ -96,6 +101,7 @@ fi
 
 %changelog
 * Fri Aug 29 2025 Sunny Yang <yxh9956@gmail.com> - 2.0.8-1
-- Final release for Copr. Switched from patching to providing a full dkms.conf.
+- Final release for Copr. Correctly separates user-space and kernel module builds.
 - Implements NVIDIA-style, fully automatic key generation and signing for Secure Boot.
 - Ships a robust, custom systemd service file for reliability.
+- Provides a custom, RPM-friendly dkms.conf file.
