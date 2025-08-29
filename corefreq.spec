@@ -33,22 +33,24 @@ cp %{SOURCE2} .
 sed -i 's/@RPM_VERSION@/%{version}/' dkms.conf
 
 %build
-# --- FINAL FIX ---
 # Do NOT build the kernel module here. Only build the user-space applications.
 make %{?_smp_mflags} corefreqd corefreq-cli
 
 %install
-# Manually install files, avoiding 'make install' to prevent packaging the .ko file
+# 1. Install the user-space applications from the 'build' directory
 install -D -m 0755 build/corefreqd %{buildroot}%{_bindir}/corefreqd
 install -D -m 0755 build/corefreq-cli %{buildroot}%{_bindir}/corefreq-cli
 
-# Install our robust, custom service file
+# 2. Install our robust, custom service file
 install -D -m 0644 %{SOURCE1} %{buildroot}%{_unitdir}/corefreqd.service
 
-# Set up the DKMS source directory
+# --- FINAL FIX ---
+# 3. Clean the source tree to remove compiled binaries before packaging for DKMS
+make clean
+
+# 4. Set up the now-clean source directory for DKMS
 %global dkms_source_dir %{_usrsrc}/%{name}-%{version}
 install -d -m 755 %{buildroot}%{dkms_source_dir}
-# This will now copy our custom dkms.conf along with all other source files
 cp -a . %{buildroot}%{dkms_source_dir}/
 
 %post
@@ -100,8 +102,9 @@ fi
 %{_usrsrc}/%{name}-%{version}/
 
 %changelog
-* Fri Aug 29 2025 Sunny Yang <yxh9956@gmail.com> - 2.0.8-1
-- Final release for Copr. Correctly separates user-space and kernel module builds.
+* Sat Aug 30 2025 Sunny Yang <yxh9956@gmail.com> - 2.0.8-1
+- Final working version for Copr.
+- Fixes duplicate file error by cleaning build artifacts before packaging DKMS sources.
 - Implements NVIDIA-style, fully automatic key generation and signing for Secure Boot.
 - Ships a robust, custom systemd service file for reliability.
 - Provides a custom, RPM-friendly dkms.conf file.
