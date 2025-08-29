@@ -7,7 +7,7 @@ Summary:        CPU monitoring software with DKMS kernel module
 
 License:        GPL-2.0-only
 URL:            https://github.com/cyring/CoreFreq
-Source0:        %{url}/archive/v%{version}/%{name}-%{version}.tar.gz
+Source0:        %{url}/archive/refs/tags/%{version}.tar.gz#/%{name}-%{version}.tar.gz
 Source1:        corefreqd.service
 Patch0:         dkms.conf.patch
 
