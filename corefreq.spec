@@ -45,8 +45,9 @@ install -D -m 0755 build/corefreq-cli %{buildroot}%{_bindir}/corefreq-cli
 install -D -m 0644 %{SOURCE1} %{buildroot}%{_unitdir}/corefreqd.service
 
 # --- FINAL FIX ---
-# 3. Clean the source tree to remove compiled binaries before packaging for DKMS
-make clean
+# 3. Manually remove the temporary build directory to clean the source tree.
+#    Do not use 'make clean' as it also depends on kernel headers.
+rm -rf build
 
 # 4. Set up the now-clean source directory for DKMS
 %global dkms_source_dir %{_usrsrc}/%{name}-%{version}
@@ -104,7 +105,7 @@ fi
 %changelog
 * Sat Aug 30 2025 Sunny Yang <yxh9956@gmail.com> - 2.0.8-1
 - Final working version for Copr.
-- Fixes duplicate file error by cleaning build artifacts before packaging DKMS sources.
+- Manually remove build artifacts to avoid 'make clean' kernel header dependency.
 - Implements NVIDIA-style, fully automatic key generation and signing for Secure Boot.
 - Ships a robust, custom systemd service file for reliability.
 - Provides a custom, RPM-friendly dkms.conf file.
