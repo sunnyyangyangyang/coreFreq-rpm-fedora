@@ -1,3 +1,7 @@
+%global _debugsource_packages 0
+%global _debuginfo_packages 0
+%global debug_package %{nil}
+
 %global corefreq_version 2.0.8
 
 Name:           corefreq
