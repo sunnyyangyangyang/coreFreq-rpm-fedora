@@ -22,7 +22,7 @@ This package provides the user-space tools and the DKMS source for the
 
 %prep
 %autosetup -n CoreFreq-%{version} -p1
-%patch0 -p1
+%patch 0 -p1
 sed -i 's/@RPM_VERSION@/%{version}/' dkms.conf
 
 %build
