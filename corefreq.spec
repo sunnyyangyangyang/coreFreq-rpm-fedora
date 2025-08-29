@@ -2,7 +2,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        1%{?dist}
+Release:        3%{?dist}
 Summary:        CPU monitoring software with DKMS kernel module
 
 License:        GPL-2.0-only
@@ -22,7 +22,7 @@ This package provides the user-space tools and the DKMS source for the
 
 %prep
 %autosetup -n CoreFreq-%{version} -p1
-%patch -p1
+%patch0 -p1
 sed -i 's/@RPM_VERSION@/%{version}/' dkms.conf
 
 %build
