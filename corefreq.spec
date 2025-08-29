@@ -6,7 +6,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        CPU monitoring software with DKMS kernel module
 
 License:        GPL-2.0-only
