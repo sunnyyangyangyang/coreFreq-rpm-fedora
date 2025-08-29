@@ -7,11 +7,13 @@ Summary:        CPU monitoring software with DKMS kernel module
 
 License:        GPL-2.0-only
 URL:            https://github.com/cyring/CoreFreq
+# Corrected Source0 URL with on-the-fly renaming
 Source0:        %{url}/archive/refs/tags/%{version}.tar.gz#/%{name}-%{version}.tar.gz
+# Source1 is our robust service file
 Source1:        corefreqd.service
-Patch0:         dkms.conf.patch
+Source2:        dkms.conf
 
-BuildRequires:  gcc make kernel-devel dkms kmod systemd-rpm-macros patch
+BuildRequires:  gcc make kernel-devel dkms kmod systemd-rpm-macros
 BuildRequires:  openssl mokutil
 Requires:       dkms kernel-devel openssl mokutil
 
@@ -22,29 +24,30 @@ This package provides the user-space tools and the DKMS source for the
 
 %prep
 %autosetup -n CoreFreq-%{version} -p1
-%patch 0 -p1
+
+
+cp %{SOURCE2} .
+
 sed -i 's/@RPM_VERSION@/%{version}/' dkms.conf
 
 %build
-# The default target 'all' builds the binaries and the .ko stub
 %make_build
 
 %install
-# --- 最终修正: 手动安装文件，绝不使用 'make install' ---
-# 1. 安装用户空间程序 (它们在 'build' 子目录中)
+# Manually install files, avoiding 'make install' to prevent packaging the .ko file
 install -D -m 0755 build/corefreqd %{buildroot}%{_bindir}/corefreqd
 install -D -m 0755 build/corefreq-cli %{buildroot}%{_bindir}/corefreq-cli
 
-# 2. 安装我们自己提供的健壮的 service 文件
+# Install our robust, custom service file
 install -D -m 0644 %{SOURCE1} %{buildroot}%{_unitdir}/corefreqd.service
 
-# 3. 设置 DKMS 源码目录
+# Set up the DKMS source directory
 %global dkms_source_dir %{_usrsrc}/%{name}-%{version}
 install -d -m 755 %{buildroot}%{dkms_source_dir}
+# This will now copy our custom dkms.conf along with all other source files
 cp -a . %{buildroot}%{dkms_source_dir}/
 
 %post
-# --- NVIDIA 级全自动签名脚本 (无需改动) ---
 MOK_KEY_DIR="/etc/pki/corefreq"
 MOK_PRIV_KEY="${MOK_KEY_DIR}/private_key.priv"
 MOK_PUB_KEY="${MOK_KEY_DIR}/public_key.der"
@@ -93,8 +96,6 @@ fi
 
 %changelog
 * Fri Aug 29 2025 Sunny Yang <yxh9956@gmail.com> - 2.0.8-1
-- Final release for Copr, validated against upstream Makefile.
-- Uses manual install to avoid 'make install' side effects, which is correct for DKMS.
+- Final release for Copr. Switched from patching to providing a full dkms.conf.
 - Implements NVIDIA-style, fully automatic key generation and signing for Secure Boot.
-- Uses a patch file for a clean, RPM-friendly dkms.conf.
 - Ships a robust, custom systemd service file for reliability.
