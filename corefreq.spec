@@ -3,7 +3,7 @@
 %global srcname CoreFreq
 
 Name:           corefreq
-Version:        2.0.8
+Version:        null
 Release:        2%{?dist}
 Summary:        CPU monitoring and tuning software with DKMS kernel module
 
