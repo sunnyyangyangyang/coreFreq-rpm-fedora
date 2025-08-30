@@ -8,7 +8,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        14%{?dist}
+Release:        15%{?dist}
 Summary:        CPU monitoring software with DKMS kernel module
 
 License:        GPL-2.0-only
@@ -49,10 +49,10 @@ cp -a . %{buildroot}%{dkms_source_dir}/
 if [ -f /var/lib/dkms/mok.pub ] && command -v mokutil >/dev/null 2>&1; then
     if ! mokutil --list-enrolled 2>/dev/null | grep -q "DKMS module signing key"; then
         # Generate random password and auto-queue the key
-        MOK_PASSWORD=$(openssl rand -base64 12 2>/dev/null || echo "dkms-$(date +%s)")
+        MOK_PASSWORD=$(printf "%08d" $((RANDOM * RANDOM % 100000000)))
         echo "--- Queueing DKMS MOK key for Secure Boot enrollment ---"
         echo -e "$MOK_PASSWORD\n$MOK_PASSWORD" | mokutil --import /var/lib/dkms/mok.pub 2>/dev/null || true
-        
+
         echo "------------------------------------------------------------------"
         echo "ATTENTION: SECURE BOOT - MOK KEY ENROLLMENT REQUIRED"
         echo "The DKMS signing key has been queued for enrollment."
