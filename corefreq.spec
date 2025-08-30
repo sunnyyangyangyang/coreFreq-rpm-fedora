@@ -8,7 +8,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        8%{?dist}
+Release:        10%{?dist}
 Summary:        CPU monitoring software with DKMS kernel module
 
 License:        GPL-2.0-only
@@ -43,61 +43,27 @@ install -d -m 755 %{buildroot}%{dkms_source_dir}
 cp -a . %{buildroot}%{dkms_source_dir}/
 
 %post
-# === NVIDIA-STYLE AUTOMATION ===
-
-# 1. Auto-enroll DKMS MOK key (like NVIDIA does)
-if [ -f /var/lib/dkms/mok.pub ] && command -v mokutil >/dev/null 2>&1; then
-    # Check if already enrolled
-    if ! mokutil --list-enrolled 2>/dev/null | grep -q "DKMS module signing key"; then
-        echo "--- Auto-enrolling DKMS signing key for Secure Boot ---"
-        # Use a predictable password that gets auto-entered
-        echo -e "dkms\ndkms" | mokutil --import /var/lib/dkms/mok.pub 2>/dev/null || :
-        
-        # Create a flag file to trigger auto-reboot suggestion
-        touch /tmp/corefreq-mok-enrolled
-        
-        echo "=================================================================="
-        echo "NVIDIA-STYLE AUTOMATION: Secure Boot key enrolled automatically!"
-        echo "Please reboot to complete setup: sudo reboot"
-        echo "After reboot, CoreFreq will work immediately with zero config."
-        echo "=================================================================="
-    fi
-elif [ ! -f /var/lib/dkms/mok.pub ]; then
-    # Generate DKMS MOK if it doesn't exist
-    echo "--- Generating DKMS MOK key ---"
-    sudo -u dkms dkms --generate-mok 2>/dev/null || :
+# Standard DKMS installation
+if dkms status -m %{name} -v %{version} 2>/dev/null | grep -q installed; then
+    dkms remove -m %{name} -v %{version} --all >/dev/null 2>&1 || true
 fi
 
-# 2. Standard DKMS installation (uses DKMS default signing)
-if dkms status -m %{name} -v %{version} | grep -q installed; then
-    dkms remove -m %{name} -v %{version} --all >/dev/null 2>&1 || :
-fi
+dkms add -m %{name} -v %{version} >/dev/null 2>&1 || true
+dkms autoinstall -m %{name} -v %{version} >/dev/null 2>&1 || true
 
-dkms add -m %{name} -v %{version} >/dev/null 2>&1 || :
-dkms autoinstall -m %{name} -v %{version} >/dev/null 2>&1 || :
-
-# 3. Enable service (will auto-start after reboot when module is available)
+# Enable and start service
 %systemd_post corefreqd.service
-systemctl enable corefreqd.service >/dev/null 2>&1 || :
+systemctl enable corefreqd.service >/dev/null 2>&1 || true
+systemctl start corefreqd.service >/dev/null 2>&1 || true
 
-# 4. Try to start service immediately (might fail on Secure Boot until reboot)
-systemctl start corefreqd.service >/dev/null 2>&1 || :
-
-# 5. User feedback
-sleep 1
+# User feedback
 if systemctl is-active --quiet corefreqd.service; then
-    echo "=================================================================="
-    echo "✅ CoreFreq is ready! Use: corefreq-cli -Oa -t frequency"
-    echo "=================================================================="
-elif [ -f /tmp/corefreq-mok-enrolled ]; then
-    rm -f /tmp/corefreq-mok-enrolled
-    # Already showed reboot message above
-    :
+    echo "CoreFreq installed and running. Use: corefreq-cli -Oa -t frequency"
 else
-    echo "=================================================================="
-    echo "✅ CoreFreq installed! Service will start automatically on boot."
-    echo "Use: corefreq-cli -Oa -t frequency"
-    echo "=================================================================="
+    echo "CoreFreq installed. For Secure Boot systems, you may need to:"
+    echo "1. Import DKMS MOK key: sudo mokutil --import /var/lib/dkms/mok.pub"
+    echo "2. Reboot and complete MOK enrollment"
+    echo "3. Then use: corefreq-cli -Oa -t frequency"
 fi
 
 %preun
