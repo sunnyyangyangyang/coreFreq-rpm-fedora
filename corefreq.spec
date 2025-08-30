@@ -83,12 +83,21 @@ fi
 
 %preun
 %systemd_preun corefreqd.service
-if [ $1 -eq 0 ]; then # Final uninstall
+if [ $1 -eq 0 ]; then # Final uninstall only
+    # Stop service and unload module
+    systemctl stop corefreqd.service >/dev/null 2>&1 || true
+    modprobe -r corefreqk >/dev/null 2>&1 || true
+    
+    # Remove DKMS module
     dkms remove -m %{name} -v %{version} --all >/dev/null 2>&1 || true
 fi
 
 %postun
 %systemd_postun_with_restart corefreqd.service
+if [ $1 -eq 0 ]; then # Final uninstall only
+    # Clean up any remaining DKMS artifacts
+    rm -rf /usr/src/%{name}-%{version} >/dev/null 2>&1 || true
+fi
 
 %files
 %license LICENSE
