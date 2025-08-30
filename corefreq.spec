@@ -8,7 +8,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        10%{?dist}
+Release:        8%{?dist}
 Summary:        CPU monitoring software with DKMS kernel module
 
 License:        GPL-2.0-only
@@ -43,7 +43,25 @@ install -d -m 755 %{buildroot}%{dkms_source_dir}
 cp -a . %{buildroot}%{dkms_source_dir}/
 
 %post
-# Standard DKMS installation
+# === AUTOMATED DKMS + MOK SETUP ===
+
+# 1. Generate DKMS MOK if needed for signing
+if [ ! -f /var/lib/dkms/mok.pub ]; then
+    echo "--- Generating DKMS MOK key for module signing ---"
+    /usr/sbin/dkms mok --generate 2>/dev/null || true
+fi
+
+# 2. Auto-enroll MOK key for Secure Boot (user can decline during reboot)
+if [ -f /var/lib/dkms/mok.pub ] && command -v mokutil >/dev/null 2>&1; then
+    if ! mokutil --list-enrolled 2>/dev/null | grep -q "DKMS module signing key"; then
+        echo "--- Queueing DKMS MOK key for Secure Boot enrollment ---"
+        # Queue key for import (user will be prompted during next boot)
+        echo -e "dkms\ndkms" | mokutil --import /var/lib/dkms/mok.pub 2>/dev/null || true
+        echo "NOTE: On next reboot, you'll be prompted to enroll the DKMS key for Secure Boot"
+    fi
+fi
+
+# 3. Standard DKMS installation (with automatic signing if MOK configured)
 if dkms status -m %{name} -v %{version} 2>/dev/null | grep -q installed; then
     dkms remove -m %{name} -v %{version} --all >/dev/null 2>&1 || true
 fi
@@ -51,19 +69,16 @@ fi
 dkms add -m %{name} -v %{version} >/dev/null 2>&1 || true
 dkms autoinstall -m %{name} -v %{version} >/dev/null 2>&1 || true
 
-# Enable and start service
+# 4. Enable and start service
 %systemd_post corefreqd.service
 systemctl enable corefreqd.service >/dev/null 2>&1 || true
 systemctl start corefreqd.service >/dev/null 2>&1 || true
 
-# User feedback
+# 5. User feedback
 if systemctl is-active --quiet corefreqd.service; then
-    echo "CoreFreq installed and running. Use: corefreq-cli -Oa -t frequency"
+    echo "✅ CoreFreq is ready! Use: corefreq-cli -Oa -t frequency"
 else
-    echo "CoreFreq installed. For Secure Boot systems, you may need to:"
-    echo "1. Import DKMS MOK key: sudo mokutil --import /var/lib/dkms/mok.pub"
-    echo "2. Reboot and complete MOK enrollment"
-    echo "3. Then use: corefreq-cli -Oa -t frequency"
+    echo "✅ CoreFreq installed! After reboot (if Secure Boot), use: corefreq-cli -Oa -t frequency"
 fi
 
 %preun
