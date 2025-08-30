@@ -5,7 +5,8 @@ Wants=dkms.service
 
 [Service]
 Type=simple
-# 简洁明了 - 如果模块未就绪，服务失败，systemd 会自动重试
+# 确保模块加载后再启动守护进程
+ExecStartPre=/sbin/modprobe corefreqk
 ExecStart=/usr/bin/corefreqd -q
 ExecStopPost=-/sbin/modprobe -r corefreqk
 Restart=on-failure
