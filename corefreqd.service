@@ -1,21 +1,13 @@
-# === ENHANCED SERVICE FILE (Handles race condition) ===
-
 [Unit]
 Description=CoreFreq Daemon
 After=systemd-modules-load.service dkms.service
 Wants=dkms.service
 
 [Service]
-Slice=system.slice
 Type=simple
-
-# Robust module loading with DKMS integration
-ExecStartPre=/bin/bash -c 'for i in {1..30}; do if /sbin/modprobe corefreqk 2>/dev/null; then exit 0; fi; echo "Waiting for DKMS to build corefreqk module (attempt $i/30)..."; /usr/sbin/dkms autoinstall -q 2>/dev/null || true; sleep 2; done; exit 1'
-
+# 简洁明了 - 如果模块未就绪，服务失败，systemd 会自动重试
 ExecStart=/usr/bin/corefreqd -q
 ExecStopPost=-/sbin/modprobe -r corefreqk
-
-# Restart policy for robustness
 Restart=on-failure
 RestartSec=5
 StartLimitBurst=3
