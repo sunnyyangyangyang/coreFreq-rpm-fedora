@@ -45,21 +45,31 @@ cp -a . %{buildroot}%{dkms_source_dir}/
 %post
 # === AUTOMATED DKMS + MOK SETUP ===
 
-# 1. Generate DKMS MOK if needed for signing
-if [ ! -f /var/lib/dkms/mok.pub ]; then
-    echo "--- Generating DKMS MOK key for module signing ---"
-    /usr/sbin/dkms mok --generate 2>/dev/null || true
-fi
-
-# 2. Auto-enroll MOK key for Secure Boot (user can decline during reboot)
+# 1/2. Auto-enroll MOK key for Secure Boot (user can decline during reboot)
 if [ -f /var/lib/dkms/mok.pub ] && command -v mokutil >/dev/null 2>&1; then
     if ! mokutil --list-enrolled 2>/dev/null | grep -q "DKMS module signing key"; then
+        # Generate random password and auto-queue the key
+        MOK_PASSWORD=$(openssl rand -base64 12 2>/dev/null || echo "dkms-$(date +%s)")
         echo "--- Queueing DKMS MOK key for Secure Boot enrollment ---"
-        # Queue key for import (user will be prompted during next boot)
-        echo -e "dkms\ndkms" | mokutil --import /var/lib/dkms/mok.pub 2>/dev/null || true
-        echo "NOTE: On next reboot, you'll be prompted to enroll the DKMS key for Secure Boot"
+        echo -e "$MOK_PASSWORD\n$MOK_PASSWORD" | mokutil --import /var/lib/dkms/mok.pub 2>/dev/null || true
+        
+        echo "------------------------------------------------------------------"
+        echo "ATTENTION: SECURE BOOT - MOK KEY ENROLLMENT REQUIRED"
+        echo "The DKMS signing key has been queued for enrollment."
+        echo "Your temporary MOK password is: $MOK_PASSWORD"
+        echo
+        echo "To complete the setup:"
+        echo "1. Reboot your computer."
+        echo "2. At the blue 'MOK Manager' screen that appears on boot,"
+        echo "   select 'Enroll MOK' and follow the prompts."
+        echo "3. Enter the password shown above: $MOK_PASSWORD"
+        echo
+        echo "After the reboot, the module will load automatically for all"
+        echo "future kernel updates."
+        echo "------------------------------------------------------------------"
     fi
 fi
+
 
 # 3. Standard DKMS installation (with automatic signing if MOK configured)
 if dkms status -m %{name} -v %{version} 2>/dev/null | grep -q installed; then
