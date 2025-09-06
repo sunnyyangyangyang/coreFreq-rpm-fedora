@@ -9,7 +9,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        1.alpha11%{?dist}
+Release:        1.alpha15%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -17,6 +17,8 @@ URL:            https://github.com/cyring/CoreFreq
 Source0:        %{url}/archive/refs/tags/%{version}.tar.gz#/%{name}-%{version}.tar.gz
 Source1:        corefreqd.service
 Source2:        Makefile.akmod
+# EDITED: Add the inner spec file as a new source.
+Source3:        corefreq-kmod.spec
 
 # Akmod BuildRequires
 BuildRequires:  kmodtool
@@ -28,9 +30,6 @@ BuildRequires:  kernel-devel
 # Runtime Requirements
 Requires:       systemd
 Suggests:       mokutil
-# CHANGED: Added an explicit requirement for the kernel module.
-# While kmodtool adds weak dependencies, this makes the relationship explicit
-# and ensures either akmod-corefreq or a pre-built kmod-corefreq is pulled in.
 Requires:       %{name}-kmod >= %{version}
 
 
@@ -39,10 +38,6 @@ Requires:       %{name}-kmod >= %{version}
 
 %description
 CoreFreq is a CPU monitoring software designed for 64-bit Processors.
-CoreFreq provides a framework to retrieve CPU data by accessing MSRs and
-thermal sensors, and offers a top-like interface to display frequency,
-temperature, performance counters, and other hardware information.
-
 This package provides the user-space tools and the akmod source for the
 'corefreqk' kernel module with full automation including Secure Boot support.
 
@@ -55,8 +50,6 @@ Requires:       %{name}-kmod-common >= %{?epoch:%{epoch}:}%{version}
 
 %description -n akmod-%{name}
 This package provides the akmod package for the %{name} kernel modules.
-The akmod system will automatically build kernel modules for new kernels
-as they are installed.
 
 %package kmod-common
 Summary:        Common files for %{name} kernel module
@@ -72,32 +65,12 @@ This package provides the common files for the %{name} kernel modules.
 # Replace original Makefile with akmod-compatible version
 cp %{SOURCE2} Makefile
 
-cat << EOF > corefreq-kmod.spec
-%global kmod_name corefreq
-Name:          %{kmod_name}-kmod
-Version:       %{corefreq_version}
-Release:       1\%{?dist}
-Summary:       The %{kmod_name} kernel module
-License:       GPL-2.0-only
-URL:           %{url}
-Source0:       %{SOURCE0}
-Source1:       %{SOURCE2}
-BuildRequires: kmodtool
-BuildRequires: gcc make
-\%kmod_pkg
-%description
-This package provides the %{kmod_name} kernel module.
-
-%build
-\%make_kmod
-%install
-\%install_kmod
-%changelog
-* Sun Sep 07 2025 Packager - %{corefreq_version}-1
-- Spec generated automatically by corefreq-akmod.spec
-EOF
-
+# REMOVED: The entire 'cat << EOF' block that generated the spec file is gone.
+# EDITED: Instead, we now copy the inner spec file into the source tree.
+# This prepares it to be included in the akmod source tarball.
+cp %{SOURCE3} corefreq-kmod.spec
 cp corefreq-kmod.spec CoreFreq-%{version}/
+
 
 %build
 # Build userspace tools only (kernel module built by akmod)
@@ -111,11 +84,6 @@ install -D -m 0755 build/corefreq-cli %{buildroot}%{_bindir}/corefreq-cli
 # Install systemd service
 install -D -m 0644 %{SOURCE1} %{buildroot}%{_unitdir}/corefreqd.service
 
-# Install man pages if they exist
-if [ -f %{name}.1 ]; then
-    install -D -m 0644 %{name}.1 %{buildroot}%{_mandir}/man1/%{name}.1
-fi
-
 # Create akmod source package
 mkdir -p %{buildroot}%{_usrsrc}/akmods/
 tar -czf %{buildroot}%{_usrsrc}/akmods/%{name}-kmod-%{version}.tar.gz \
@@ -127,6 +95,7 @@ tar -czf %{buildroot}%{_usrsrc}/akmods/%{name}-kmod-%{version}.tar.gz \
     --exclude='*.mod.*' \
     --exclude='.git*' \
     --exclude='*.rpm' \
+    # EDITED: The --exclude='*.spec' line is no longer present.
     -C %{_builddir}/CoreFreq-%{version} .
 
 # Create the correct RELATIVE .latest symlink
