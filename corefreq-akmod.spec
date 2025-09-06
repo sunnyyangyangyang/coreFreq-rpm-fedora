@@ -21,9 +21,10 @@ Source2:        Makefile.akmod
 
 # Akmod BuildRequires
 BuildRequires:  kmodtool
+BuildRequires:  akmods
 BuildRequires:  gcc make
 BuildRequires:  systemd-rpm-macros
-%{!?kernels:BuildRequires: buildsys-build-rpmfusion-kerneldevpkgs-%{?buildforkernels:%{buildforkernels}}%{!?buildforkernels:current}-%{_target_cpu}}
+BuildRequires:  kernel-devel
 
 # Generate akmod metadata
 %{expand:%(kmodtool --target %{_target_cpu} --kmodname %{name} --pattern ".*" %{?buildforkernels:--%{buildforkernels}} %{?kernels:--for-kernels "%{?kernels}"} 2>/dev/null) }
