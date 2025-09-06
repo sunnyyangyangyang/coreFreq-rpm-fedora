@@ -107,7 +107,7 @@ tar -czf %{buildroot}%{_usrsrc}/akmods/%{name}-kmod-%{version}.tar.gz \
     -C %{_builddir}/CoreFreq-%{version} .
 
 # THIS IS THE NEW SECTION YOU MUST ADD
-%install -n akmod-%{name}
+#%install -n akmod-%{name}
 # Create the .latest symlink that akmods requires for discovery
 ln -s %{_usrsrc}/akmods/%{name}-kmod-%{version}.tar.gz %{buildroot}%{_usrsrc}/akmods/%{name}-kmod.latest
 
