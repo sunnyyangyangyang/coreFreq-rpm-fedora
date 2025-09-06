@@ -87,9 +87,7 @@ BuildRequires: gcc make
 \%kmod_pkg
 %description
 This package provides the %{kmod_name} kernel module.
-%prep
-\%autosetup -n CoreFreq-%{version} -p1
-cp %{SOURCE1} Makefile
+
 %build
 \%make_kmod
 %install
