@@ -67,7 +67,7 @@ done
 
 %build
 # Build userspace tools
-make %{?_smp_mflags} corefreqd corefreq-cli
+make %{?_smp_mflags} userspace
 
 # Build kernel modules for akmod
 for kernel_version in %{?kernel_versions}; do
