@@ -23,8 +23,8 @@ Source2:        Makefile.akmod
 BuildRequires:  kmodtool
 BuildRequires:  gcc make
 BuildRequires:  systemd-rpm-macros
-
 BuildRequires:  kernel-devel
+Supplements:    %{name}%{?_isa} = %{version}-%{release}
 
 %description
 CoreFreq is a CPU monitoring software designed for 64-bit Processors.
