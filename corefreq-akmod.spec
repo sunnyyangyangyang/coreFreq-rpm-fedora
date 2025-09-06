@@ -81,18 +81,12 @@ install -D -m 0644 %{SOURCE1} %{buildroot}%{_unitdir}/corefreqd.service
 # Create akmod source package
 mkdir -p %{buildroot}%{_usrsrc}/akmods/
 tar -czf %{buildroot}%{_usrsrc}/akmods/%{name}-kmod-%{version}.tar.gz \
-    --transform 's,^,%{name}-%{version}/,' \
     --exclude-vcs \
     --exclude='build/*' \
     --exclude='*.o' \
     --exclude='*.ko' \
-    --exclude='*.mod.*' \
-    --exclude='.git*' \
-    --exclude='*.rpm' \
-    # EDITED: The --exclude='*.spec' line is no longer present.
-    -C %{_builddir}/CoreFreq-%{version} .
+    -C %{_builddir} CoreFreq-%{version}
 
-# Create the correct RELATIVE .latest symlink
 ln -s %{name}-kmod-%{version}.tar.gz %{buildroot}%{_usrsrc}/akmods/%{name}-kmod.latest
 
 
