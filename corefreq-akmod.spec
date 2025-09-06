@@ -91,7 +91,7 @@ done
 
 # Install akmod sources
 install -d %{buildroot}%{_usrsrc}/akmods/
-cp -a . %{buildroot}%{_usrsrc}/akmods/%{name}-%{version}
+tar -czf %{name}-%{version}.tar.gz .
 rm -rf %{buildroot}%{_usrsrc}/akmods/%{name}-%{version}/_kmod_build_*
 rm -rf %{buildroot}%{_usrsrc}/akmods/%{name}-%{version}/build
 
@@ -175,7 +175,7 @@ done
 %{_unitdir}/corefreqd.service
 
 %files -n akmod-%{name}
-%{_usrsrc}/akmods/%{name}-%{version}
+%{_usrsrc}/akmods/%{name}-%{version}.tar.gz
 
 %files kmod-common
 # This is for files shared between kmod packages
