@@ -25,7 +25,7 @@ BuildRequires:  gcc make
 BuildRequires:  systemd-rpm-macros
 
 # Get kernel-devel version
-%{!?kernels: BuildRequires: buildsys-build-rpmfusion-kerneldevpkgs-%{?buildforkernels:%{buildforkernels}}%{!?buildforkernels:current}-%{_target_cpu}}
+%{!?kernels:BuildRequires: @kernel-devel-packages}
 
 # kmodtool does its magic here
 %{expand:%(kmodtool --target %{_target_cpu} --kmodname %{name} %{?buildforkernels:--%{buildforkernels}} %{?kernels:--for-kernels "%{?kernels}"} 2>/dev/null) }
