@@ -9,7 +9,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        1.alpha6%{?dist}
+Release:        1.alpha7%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -28,6 +28,11 @@ BuildRequires:  kernel-devel
 # Runtime Requirements
 Requires:       systemd
 Suggests:       mokutil
+# CHANGED: Added an explicit requirement for the kernel module.
+# While kmodtool adds weak dependencies, this makes the relationship explicit
+# and ensures either akmod-corefreq or a pre-built kmod-corefreq is pulled in.
+Requires:       %{name}-kmod >= %{version}
+
 
 # Generate akmod metadata
 %{expand:%(kmodtool --target %{_target_cpu} --kmodname %{name} --pattern ".*" %{?buildforkernels:--%{buildforkernels}} %{?kernels:--for-kernels "%{?kernels}"} 2>/dev/null) }
@@ -45,7 +50,7 @@ This package provides the user-space tools and the akmod source for the
 Summary:        Akmod package for %{name} kernel module(s)
 Requires:       kmodtool
 Requires:       akmods
-Provides:       %{name}-kmod = %{?epoch:%{epoch}:}%{version}
+Provides:       %{name}-kmod = %{?epoch:%{epoch}:}%{version}-%{release}
 Requires:       %{name}-kmod-common >= %{?epoch:%{epoch}:}%{version}
 
 %description -n akmod-%{name}
@@ -109,7 +114,7 @@ if ! %{buildroot}%{_bindir}/corefreqd -h >/dev/null 2>&1; then
 fi
 if ! %{buildroot}%{_bindir}/corefreq-cli -h >/dev/null 2>&1; then
     echo "ERROR: corefreq-cli help test failed"
-    # Don't fail build for this - some binaries need privileged access
+    # Don't fail for this - some binaries need privileged access
 fi
 
 %post
@@ -157,45 +162,25 @@ fi
 %systemd_post corefreqd.service
 systemctl enable corefreqd.service >/dev/null 2>&1 || true
 
-# 3. Trigger akmod build for current kernel
-if [ -x %{_bindir}/akmods ]; then
-    echo "🔨 Building kernel module for $(uname -r)..."
-    # Force rebuild and show output for debugging
-    %{_bindir}/akmods --akmod %{name} --kernels "$(uname -r)" --force || {
-        echo "❌ Akmod build failed. Checking logs..."
-        if [ -f /var/cache/akmods/%{name}/*.log ]; then
-            echo "Last few lines from akmod log:"
-            tail -10 /var/cache/akmods/%{name}/*.log 2>/dev/null || true
-        fi
-    }
-fi
+# REMOVED: The entire block that tried to build the module prematurely.
+# The build is now correctly handled by the %post scriptlet of the
+# akmod-corefreq package itself.
 
-# 4. Try to load and start if successful
-module_loaded=false
-if [ -f "/lib/modules/$(uname -r)/extra/corefreqk.ko" ] || [ -f "/lib/modules/$(uname -r)/updates/corefreqk.ko" ]; then
-    /sbin/depmod -a "$(uname -r)" 2>/dev/null || true
-    if /sbin/modprobe corefreqk >/dev/null 2>&1; then
-        module_loaded=true
-        systemctl start corefreqd.service >/dev/null 2>&1 || true
-    fi
-fi
-
-# 5. User feedback
+# CHANGED: Updated user feedback to be accurate.
 echo ""
-if systemctl is-active --quiet corefreqd.service; then
-    echo "✅ CoreFreq is running! Try: corefreq-cli -t"
-elif $module_loaded; then
-    echo "✅ CoreFreq module loaded! Starting service..."
-    echo "   Try: corefreq-cli -t"
-elif [ -f /sys/firmware/efi/efivars/SecureBoot-* ] && [ "$(cat /sys/firmware/efi/efivars/SecureBoot-* 2>/dev/null | tail -c 1 | od -An -tu1)" = " 1" ]; then
-    echo "🔐 CoreFreq installed! Please reboot to enroll MOK key for Secure Boot."
-    echo "   After reboot: corefreq-cli -t"
-else
-    echo "✅ CoreFreq installed! Module will build automatically."
-    echo "   Manual build: sudo akmods --akmod corefreq"
-    echo "   Usage: corefreq-cli -t"
+echo "✅ CoreFreq installed!"
+echo "   The kernel module will now be built automatically in the background."
+echo "   The service will start once the module is ready."
+echo ""
+if [ -f /sys/firmware/efi/efivars/SecureBoot-* ] && [ "$(cat /sys/firmware/efi/efivars/SecureBoot-* 2>/dev/null | tail -c 1 | od -An -tu1)" = " 1" ]; then
+    echo "🔐 Secure Boot is enabled. If you see MOK enrollment messages,"
+    echo "   please reboot and follow the on-screen instructions."
 fi
 echo ""
+echo "   To check status: systemctl status corefreqd.service"
+echo "   Once running, use: corefreq-cli -t"
+echo ""
+
 
 %preun
 %systemd_preun corefreqd.service
@@ -207,6 +192,7 @@ fi
 %postun
 %systemd_postun_with_restart corefreqd.service
 
+# THIS IS THE CORRECT PLACE TO TRIGGER THE BUILD
 %post -n akmod-%{name}
 # Trigger akmod build
 nohup %{_bindir}/akmods --from-akmod-posttrans --akmod %{name} --kernels "%{?kernel_versions}" &> /dev/null &
@@ -234,6 +220,12 @@ fi
 # Common files for kmod packages (empty for this package)
 
 %changelog
+* Sun Sep 01 2025 Package Maintainer <package@example.com> - 2.0.8-1.alpha7
+- Fix akmod build trigger by moving it to the akmod subpackage post-install scriptlet
+- Remove premature build attempt from main package post-install scriptlet
+- Adjust user feedback messages for accuracy during installation
+- Add explicit 'Requires: corefreq-kmod' to main package for dependency clarity
+
 * Sat Aug 30 2025 Package Maintainer <package@example.com> - 2.0.8-1.alpha6
 - Fixed changelog dates for COPR compatibility
 - Improved %check section to not fail on privilege-dependent binaries
