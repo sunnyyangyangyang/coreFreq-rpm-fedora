@@ -9,7 +9,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        1.alpha9%{?dist}
+Release:        1.alpha10%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -105,6 +105,11 @@ tar -czf %{buildroot}%{_usrsrc}/akmods/%{name}-kmod-%{version}.tar.gz \
     --exclude='*.rpm' \
     --exclude='*.spec' \
     -C %{_builddir}/CoreFreq-%{version} .
+
+# THIS IS THE NEW SECTION YOU MUST ADD
+%install -n akmod-%{name}
+# Create the .latest symlink that akmods requires for discovery
+ln -s %{_usrsrc}/akmods/%{name}-kmod-%{version}.tar.gz %{buildroot}%{_usrsrc}/akmods/%{name}-kmod.latest
 
 %check
 # Basic validation of built binaries (fixed to use correct path)
@@ -215,6 +220,8 @@ fi
 
 %files -n akmod-%{name}
 %{_usrsrc}/akmods/%{name}-kmod-%{version}.tar.gz
+# Add the new symlink to the file list
+%{_usrsrc}/akmods/%{name}-kmod.latest
 
 %files kmod-common
 # Common files for kmod packages (empty for this package)
