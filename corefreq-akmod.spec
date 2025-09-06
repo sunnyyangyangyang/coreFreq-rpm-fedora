@@ -17,6 +17,7 @@ License:        GPL-2.0-only
 URL:            https://github.com/cyring/CoreFreq
 Source0:        %{url}/archive/refs/tags/%{version}.tar.gz#/%{name}-%{version}.tar.gz
 Source1:        corefreqd.service
+Source2:        Makefile.akmod
 
 # Akmod BuildRequires
 BuildRequires:  kmodtool
