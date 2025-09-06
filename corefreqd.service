@@ -1,18 +1,37 @@
 [Unit]
 Description=CoreFreq Daemon
-After=systemd-modules-load.service dkms.service
-Wants=dkms.service
+After=systemd-modules-load.service akmods.service
+Wants=akmods.service
+# Wait for akmod to potentially build and install module
+After=basic.target
 
 [Service]
 Type=simple
-# 确保模块加载后再启动守护进程
-ExecStartPre=/sbin/modprobe corefreqk
+# Robust module loading with multiple attempts and locations
+ExecStartPre=-/bin/sh -c '\
+    for i in $(seq 1 30); do \
+        if /sbin/modprobe corefreqk; then \
+            echo "CoreFreq module loaded successfully"; \
+            exit 0; \
+        elif [ -f "/lib/modules/$(uname -r)/extra/corefreqk.ko" ] || [ -f "/lib/modules/$(uname -r)/updates/corefreqk.ko" ]; then \
+            echo "Module file exists but failed to load, retrying in 2s..."; \
+            sleep 2; \
+        else \
+            echo "Module not found, waiting for akmod build (attempt $i/30)..."; \
+            sleep 2; \
+        fi; \
+    done; \
+    echo "Failed to load corefreqk module after 30 attempts"; \
+    exit 1'
+
 ExecStart=/usr/bin/corefreqd -q
 ExecStopPost=-/sbin/modprobe -r corefreqk
 Restart=on-failure
 RestartSec=5
 StartLimitBurst=3
 StartLimitIntervalSec=60
+# Allow extra time for akmod builds and module loading
+TimeoutStartSec=120
 
 [Install]
 WantedBy=multi-user.target

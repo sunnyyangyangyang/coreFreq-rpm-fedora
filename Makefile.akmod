@@ -1,0 +1,105 @@
+# CoreFreq Akmod-compatible Makefile
+# Based on the original CoreFreq Makefile structure
+
+# Variables from original CoreFreq Makefile
+COREFREQ_MAJOR = 2
+COREFREQ_MINOR = 0
+COREFREQ_REV = 8
+HW = $(shell uname -m)
+CC ?= cc
+WARNING ?= -Wall -Wfatal-errors
+PWD ?= $(shell pwd)
+BUILD ?= build
+
+# Akmod-specific variables
+KERNELDIR ?= /lib/modules/$(shell uname -r)/build
+KVERSION ?= $(shell uname -r)
+
+# Default build options
+CORE_COUNT ?= 256
+TASK_ORDER = 5
+MAX_FREQ_HZ ?= 7125000000
+MSR_CORE_PERF_UCC ?= MSR_IA32_APERF
+MSR_CORE_PERF_URC ?= MSR_IA32_MPERF
+UBENCH = 0
+ifeq ($(HW), x86_64)
+DELAY_TSC ?= 1
+else
+DELAY_TSC = 0
+endif
+
+# Kernel module build configuration
+obj-m := corefreqk.o
+corefreqk-y := module/corefreqk.o
+
+ccflags-y := -I$(PWD)/$(HW)
+ccflags-y +=	-D COREFREQ_MAJOR=$(COREFREQ_MAJOR) \
+		-D COREFREQ_MINOR=$(COREFREQ_MINOR) \
+		-D COREFREQ_REV=$(COREFREQ_REV) \
+		-D CORE_COUNT=$(CORE_COUNT) \
+		-D TASK_ORDER=$(TASK_ORDER) \
+		-D MAX_FREQ_HZ=$(MAX_FREQ_HZ)
+ccflags-y += $(WARNING)
+
+# Userspace build definitions
+DEFINITIONS =	-D COREFREQ_MAJOR=$(COREFREQ_MAJOR) \
+		-D COREFREQ_MINOR=$(COREFREQ_MINOR) \
+		-D COREFREQ_REV=$(COREFREQ_REV) \
+		-D CORE_COUNT=$(CORE_COUNT) -D TASK_ORDER=$(TASK_ORDER) \
+		-D MAX_FREQ_HZ=$(MAX_FREQ_HZ) -D UBENCH=$(UBENCH)
+
+ifneq ($(DELAY_TSC),)
+DEFINITIONS += -D DELAY_TSC=$(DELAY_TSC)
+ccflags-y += -D DELAY_TSC=$(DELAY_TSC)
+endif
+
+ccflags-y += -D MSR_CORE_PERF_UCC=$(MSR_CORE_PERF_UCC)
+ccflags-y += -D MSR_CORE_PERF_URC=$(MSR_CORE_PERF_URC)
+
+.PHONY: all clean userspace modules modules_install help prepare
+
+all: prepare userspace modules
+
+# Prepare build environment (simplified from original)
+prepare:
+	@if [ ! -d $(BUILD) ]; then mkdir -p $(BUILD); fi
+	@if [ ! -d $(BUILD)/module ]; then mkdir -p $(BUILD)/module; fi
+	@if [ ! -e $(BUILD)/Makefile ]; then \
+		cd $(BUILD) && ln -sf ../Makefile Makefile; \
+	fi
+	@if [ ! -e $(BUILD)/module/corefreqk.c ]; then \
+		cd $(BUILD)/module && ln -sf ../../$(HW)/corefreqk.c corefreqk.c; \
+	fi
+
+# Userspace applications (simplified build)
+userspace: prepare
+	$(CC) $(WARNING) -pthread $(DEFINITIONS) \
+		$(HW)/corefreqd.c $(HW)/corefreqm.c \
+		-o $(BUILD)/corefreqd -lpthread -lm -lrt -lc
+	$(CC) $(WARNING) $(DEFINITIONS) \
+		$(HW)/corefreq-cli.c $(HW)/corefreq-ui.c $(HW)/corefreq-cli-rsc.c \
+		$(HW)/corefreq-cli-json.c $(HW)/corefreq-cli-extra.c \
+		-o $(BUILD)/corefreq-cli -lm -lrt -lc
+
+# Kernel modules (called by akmod)
+modules: prepare
+	$(MAKE) -C $(KERNELDIR) M=$(PWD)/$(BUILD) modules
+	@if [ -e $(BUILD)/corefreqk.ko ]; then cp $(BUILD)/corefreqk.ko $(BUILD)/; fi
+
+modules_install: modules
+	$(MAKE) -C $(KERNELDIR) M=$(PWD)/$(BUILD) modules_install
+
+clean:
+	@if [ -d $(BUILD) ]; then \
+		$(MAKE) -C $(KERNELDIR) M=$(PWD)/$(BUILD) clean 2>/dev/null || true; \
+		rm -rf $(BUILD); \
+	fi
+
+help:
+	@echo "CoreFreq Akmod Makefile targets:"
+	@echo "  all          - Build userspace tools and kernel module"
+	@echo "  userspace    - Build only userspace tools"
+	@echo "  modules      - Build only kernel module"  
+	@echo "  prepare      - Prepare build environment"
+	@echo "  clean        - Clean build artifacts"
+	@echo "  modules_install - Install kernel module"
