@@ -18,7 +18,7 @@ Source0:        %{url}/archive/refs/tags/%{version}.tar.gz#/%{name}-%{version}.t
 Source1:        corefreqd.service
 Source2:        Makefile.akmod
 # EDITED: Add the inner spec file as a new source.
-Source3:        corefreq-kmod.spec
+Source3:        corefreq-kmod.spec.in
 
 # Akmod BuildRequires
 BuildRequires:  kmodtool
@@ -64,10 +64,6 @@ This package provides the common files for the %{name} kernel modules.
 
 # Replace original Makefile with akmod-compatible version
 cp %{SOURCE2} Makefile
-
-# REMOVED: The entire 'cat << EOF' block that generated the spec file is gone.
-# EDITED: Instead, we now copy the inner spec file into the source tree.
-# This prepares it to be included in the akmod source tarball.
 cp %{SOURCE3} corefreq-kmod.spec
 cp corefreq-kmod.spec CoreFreq-%{version}/
 
