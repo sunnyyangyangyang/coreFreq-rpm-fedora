@@ -91,7 +91,7 @@ done
 
 # Install akmod sources
 install -d %{buildroot}%{_usrsrc}/akmods/
-tar -czf %{name}-%{version}.tar.gz .
+tar -czf %{name}-%{version}.tar.gz --exclude='%{name}-%{version}.tar.gz' .
 rm -rf %{buildroot}%{_usrsrc}/akmods/%{name}-%{version}/_kmod_build_*
 rm -rf %{buildroot}%{_usrsrc}/akmods/%{name}-%{version}/build
 
