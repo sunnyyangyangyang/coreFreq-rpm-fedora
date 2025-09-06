@@ -25,11 +25,8 @@ BuildRequires:  gcc make
 BuildRequires:  systemd-rpm-macros
 %{!?kernels:BuildRequires: buildsys-build-rpmfusion-kerneldevpkgs-%{?buildforkernels:%{buildforkernels}}%{!?buildforkernels:current}-%{_target_cpu}}
 
-# This macro is the heart of the akmod system. It generates all the
-# necessary metadata (Provides, Requires) that the akmods tool needs
-# to recognize and build the module correctly.
+# Generate akmod metadata
 %{expand:%(kmodtool --target %{_target_cpu} --kmodname %{name} --pattern ".*" %{?buildforkernels:--%{buildforkernels}} %{?kernels:--for-kernels "%{?kernels}"} 2>/dev/null) }
-Requires:    %{name}%{?_isa} = %{version}-%{release}
 
 %description
 CoreFreq is a CPU monitoring software designed for 64-bit Processors.
@@ -57,93 +54,97 @@ This package provides the common files for the %{name} kernel modules.
 %prep
 %autosetup -n CoreFreq-%{version} -p1
 
-# Replace original complex Makefile with akmod-compatible version
+# Replace original Makefile with akmod-compatible version
 cp %{SOURCE2} Makefile
 
-# Copy sources to akmod builddir
-for kernel_version in %{?kernel_versions}; do
-    mkdir -p _kmod_build_${kernel_version%%___*}
-    cp -a . _kmod_build_${kernel_version%%___*}/
-    pushd _kmod_build_${kernel_version%%___*}
-    # Ensure akmod-compatible Makefile is used
-    cp %{SOURCE2} Makefile
-    popd
-done
-
 %build
-# Build userspace tools
+# Build userspace tools only
 make %{?_smp_mflags} userspace
 
-# Build kernel modules for akmod
-for kernel_version in %{?kernel_versions}; do
-    pushd _kmod_build_${kernel_version%%___*}
-    make %{?_smp_mflags} KERNELDIR=${kernel_version##*___} all
-    popd
-done
-
 %install
-
+# Install userspace binaries
 install -D -m 0755 build/corefreqd %{buildroot}%{_bindir}/corefreqd
 install -D -m 0755 build/corefreq-cli %{buildroot}%{_bindir}/corefreq-cli
 install -D -m 0644 %{SOURCE1} %{buildroot}%{_unitdir}/corefreqd.service
 
-tar -czf ../%{name}-%{version}.tar.gz .
-
-install -D -m 0644 ../%{name}-%{version}.tar.gz %{buildroot}%{_usrsrc}/akmods/%{name}-%{version}.tar.gz
+# Create akmod source package
+mkdir -p %{buildroot}%{_usrsrc}/akmods/
+tar -czf %{buildroot}%{_usrsrc}/akmods/%{name}-%{version}-%{release}.tar.gz \
+    --exclude-vcs \
+    --exclude='build/*' \
+    --exclude='*.o' \
+    --exclude='*.ko' \
+    --exclude='*.mod.*' \
+    --exclude='.tmp_versions' \
+    --exclude='Module.symvers' \
+    --exclude='modules.order' \
+    -C %{_builddir} CoreFreq-%{version}/
 
 %post
-# === AUTOMATED DKMS + MOK SETUP (adapted for akmod) ===
+# === AUTOMATED AKMOD + MOK SETUP ===
 
-# 1. Auto-enroll MOK key for Secure Boot (user can decline during reboot)
+# 1. Auto-enroll MOK key for Secure Boot
 if [ -f /etc/pki/akmods/certs/public_key.der ] && command -v mokutil >/dev/null 2>&1; then
     if ! mokutil --list-enrolled 2>/dev/null | grep -q "akmods"; then
-        # Generate random password and auto-queue the key
-        MOK_PASSWORD=$(printf "%08d" $((RANDOM * RANDOM % 100000000)))
+        MOK_PASSWORD=$(openssl rand -hex 8 2>/dev/null || printf "%08x" $((RANDOM * RANDOM)))
         echo "--- Queueing akmods MOK key for Secure Boot enrollment ---"
         echo -e "$MOK_PASSWORD\n$MOK_PASSWORD" | mokutil --import /etc/pki/akmods/certs/public_key.der 2>/dev/null || true
 
-        echo "------------------------------------------------------------------"
-        echo "ATTENTION: SECURE BOOT - MOK KEY ENROLLMENT REQUIRED"
-        echo "The akmods signing key has been queued for enrollment."
-        echo "Your temporary MOK password is: $MOK_PASSWORD"
-        echo
-        echo "To complete the setup:"
-        echo "1. Reboot your computer."
-        echo "2. At the blue 'MOK Manager' screen that appears on boot,"
-        echo "   select 'Enroll MOK' and follow the prompts."
-        echo "3. Enter the password shown above: $MOK_PASSWORD"
-        echo
-        echo "After the reboot, the module will load automatically for all"
-        echo "future kernel updates."
-        echo "------------------------------------------------------------------"
+        cat << EOF
+------------------------------------------------------------------
+ATTENTION: SECURE BOOT - MOK KEY ENROLLMENT REQUIRED
+The akmods signing key has been queued for enrollment.
+Your temporary MOK password is: $MOK_PASSWORD
+
+To complete the setup:
+1. Reboot your computer.
+2. At the blue 'MOK Manager' screen that appears on boot,
+   select 'Enroll MOK' and follow the prompts.
+3. Enter the password shown above: $MOK_PASSWORD
+
+After the reboot, the module will load automatically for all
+future kernel updates.
+------------------------------------------------------------------
+EOF
     fi
 fi
 
-# 2. Try to load the kernel module if it exists for current kernel
-if [ -f "/lib/modules/$(uname -r)/extra/corefreqk.ko" ] || [ -f "/lib/modules/$(uname -r)/updates/corefreqk.ko" ]; then
+# 2. Enable and start service
+%systemd_post corefreqd.service
+systemctl enable corefreqd.service >/dev/null 2>&1 || true
+
+# 3. Trigger akmod build for current kernel
+if [ -x %{_bindir}/akmods ]; then
+    echo "Building kernel module for current kernel..."
+    %{_bindir}/akmods --kernels "$(uname -r)" --akmod %{name} || true
+fi
+
+# 4. Try to load the kernel module if it was built successfully
+if [ -f "/lib/modules/$(uname -r)/extra/corefreqk.ko" ]; then
+    /sbin/depmod -a "$(uname -r)" 2>/dev/null || true
     /sbin/modprobe corefreqk >/dev/null 2>&1 || true
 fi
 
-# 3. Enable and start service
-%systemd_post corefreqd.service
-systemctl enable corefreqd.service >/dev/null 2>&1 || true
-systemctl start corefreqd.service >/dev/null 2>&1 || true
+# 5. Start service if module is loaded
+if lsmod | grep -q corefreqk; then
+    systemctl start corefreqd.service >/dev/null 2>&1 || true
+fi
 
-# 4. User feedback
+# 6. User feedback
 if systemctl is-active --quiet corefreqd.service; then
     echo "✅ CoreFreq is ready! Use: corefreq-cli -Oa -t frequency"
 elif lsmod | grep -q corefreqk; then
-    echo "✅ CoreFreq module loaded! Service will start automatically."
+    echo "✅ CoreFreq module loaded! Starting service..."
     echo "   Use: corefreq-cli -Oa -t frequency"
 else
-    echo "✅ CoreFreq installed! After reboot (if Secure Boot), use: corefreq-cli -Oa -t frequency"
-    echo "   Or manually load with: sudo modprobe corefreqk && sudo systemctl start corefreqd"
+    echo "✅ CoreFreq installed! Module will build on next kernel update or reboot."
+    echo "   Manual build: sudo akmods --akmod corefreq"
+    echo "   Then use: corefreq-cli -Oa -t frequency"
 fi
 
 %preun
 %systemd_preun corefreqd.service
 if [ $1 -eq 0 ]; then # Final uninstall only
-    # Stop service and unload module
     systemctl stop corefreqd.service >/dev/null 2>&1 || true
     modprobe -r corefreqk >/dev/null 2>&1 || true
 fi
@@ -152,16 +153,17 @@ fi
 %systemd_postun_with_restart corefreqd.service
 
 %post -n akmod-%{name}
-nohup %{_bindir}/akmods --from-akmod-posttrans --akmod %{name} --kernels %{kernel_versions} &> /dev/null &
+# Trigger akmod build
+nohup %{_bindir}/akmods --from-akmod-posttrans --akmod %{name} --kernels "%{?kernel_versions}" &> /dev/null &
 
 %preun -n akmod-%{name}
 # Remove all versions of the module
-for kver in $(rpm -q --qf '%%{version}-%%{release}.%%{arch}\n' kernel kernel-devel 2>/dev/null | sort -u); do
-    if [ -d "/lib/modules/$kver/extra" ]; then
+if [ $1 -eq 0 ]; then # Final uninstall only
+    for kver in $(find /lib/modules -name "corefreqk.ko" -exec dirname {} \; | sed 's|.*/modules/||;s|/.*||' | sort -u); do
         rm -f "/lib/modules/$kver/extra/corefreqk.ko" 2>/dev/null || true
         /sbin/depmod -a "$kver" 2>/dev/null || true
-    fi
-done
+    done
+fi
 
 %files
 %license LICENSE
@@ -171,13 +173,17 @@ done
 %{_unitdir}/corefreqd.service
 
 %files -n akmod-%{name}
-%{_usrsrc}/akmods/%{name}-%{version}.tar.gz
+%{_usrsrc}/akmods/%{name}-%{version}-%{release}.tar.gz
 
 %files kmod-common
-# This is for files shared between kmod packages
-# Usually empty for simple kernel modules
+# Common files for kmod packages (empty for this package)
 
 %changelog
+* Mon Sep 06 2025 - Release 8.1
+- Fixed akmod source packaging path
+- Improved MOK password generation
+- Enhanced module loading logic
+- Better error handling in post scripts
 * Sat Aug 30 2025 - Release 8
 - Converted from DKMS to akmod format for COPR
 - NVIDIA-style full automation with akmod integration
