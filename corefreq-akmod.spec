@@ -1,5 +1,4 @@
-# === AKMOD SPEC FILE ===
-
+# CoreFreq Akmod RPM Spec - Enhanced Version
 %global _debugsource_packages 0
 %global _debuginfo_packages 0
 %global debug_package %{nil}
@@ -10,7 +9,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        1.alpha3%{?dist}
+Release:        1.alpha4%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -26,13 +25,21 @@ BuildRequires:  gcc make
 BuildRequires:  systemd-rpm-macros
 BuildRequires:  kernel-devel
 
+# Runtime Requirements
+Requires:       systemd
+Suggests:       mokutil
+
 # Generate akmod metadata
 %{expand:%(kmodtool --target %{_target_cpu} --kmodname %{name} --pattern ".*" %{?buildforkernels:--%{buildforkernels}} %{?kernels:--for-kernels "%{?kernels}"} 2>/dev/null) }
 
 %description
 CoreFreq is a CPU monitoring software designed for 64-bit Processors.
+CoreFreq provides a framework to retrieve CPU data by accessing MSRs and
+thermal sensors, and offers a top-like interface to display frequency,
+temperature, performance counters, and other hardware information.
+
 This package provides the user-space tools and the akmod source for the
-'corefreqk' kernel module with full automation.
+'corefreqk' kernel module with full automation including Secure Boot support.
 
 %package -n akmod-%{name}
 Summary:        Akmod package for %{name} kernel module(s)
@@ -43,6 +50,8 @@ Requires:       %{name}-kmod-common >= %{?epoch:%{epoch}:}%{version}
 
 %description -n akmod-%{name}
 This package provides the akmod package for the %{name} kernel modules.
+The akmod system will automatically build kernel modules for new kernels
+as they are installed.
 
 %package kmod-common
 Summary:        Common files for %{name} kernel module
@@ -59,18 +68,26 @@ This package provides the common files for the %{name} kernel modules.
 cp %{SOURCE2} Makefile
 
 %build
-# Build userspace tools only
+# Build userspace tools only (kernel module built by akmod)
 make %{?_smp_mflags} userspace
 
 %install
 # Install userspace binaries
 install -D -m 0755 build/corefreqd %{buildroot}%{_bindir}/corefreqd
 install -D -m 0755 build/corefreq-cli %{buildroot}%{_bindir}/corefreq-cli
+
+# Install systemd service
 install -D -m 0644 %{SOURCE1} %{buildroot}%{_unitdir}/corefreqd.service
+
+# Install man pages if they exist
+if [ -f %{name}.1 ]; then
+    install -D -m 0644 %{name}.1 %{buildroot}%{_mandir}/man1/%{name}.1
+fi
 
 # Create akmod source package
 mkdir -p %{buildroot}%{_usrsrc}/akmods/
 tar -czf %{buildroot}%{_usrsrc}/akmods/%{name}-%{version}-%{release}.tar.gz \
+    --transform 's,^,%{name}-%{version}/,' \
     --exclude-vcs \
     --exclude='build/*' \
     --exclude='*.o' \
@@ -79,75 +96,106 @@ tar -czf %{buildroot}%{_usrsrc}/akmods/%{name}-%{version}-%{release}.tar.gz \
     --exclude='.tmp_versions' \
     --exclude='Module.symvers' \
     --exclude='modules.order' \
+    --exclude='.git*' \
+    --exclude='*.rpm' \
+    --exclude='*.spec' \
     -C %{_builddir} CoreFreq-%{version}/
+
+%check
+# Basic validation of built binaries
+%{buildroot}%{_bindir}/corefreqd -h >/dev/null
+%{buildroot}%{_bindir}/corefreq-cli -h >/dev/null
 
 %post
 # === AUTOMATED AKMOD + MOK SETUP ===
 
-# 1. Auto-enroll MOK key for Secure Boot
+# Function to generate secure password
+generate_mok_password() {
+    if command -v openssl >/dev/null 2>&1; then
+        openssl rand -hex 12 2>/dev/null
+    else
+        printf "%012x" $((RANDOM * RANDOM * RANDOM)) 2>/dev/null
+    fi
+}
+
+# 1. Auto-enroll MOK key for Secure Boot (only if needed)
 if [ -f /etc/pki/akmods/certs/public_key.der ] && command -v mokutil >/dev/null 2>&1; then
-    if ! mokutil --list-enrolled 2>/dev/null | grep -q "akmods"; then
-        MOK_PASSWORD=$(openssl rand -hex 8 2>/dev/null || printf "%08x" $((RANDOM * RANDOM)))
-        echo "--- Queueing akmods MOK key for Secure Boot enrollment ---"
-        echo -e "$MOK_PASSWORD\n$MOK_PASSWORD" | mokutil --import /etc/pki/akmods/certs/public_key.der 2>/dev/null || true
-
-        cat << EOF
-------------------------------------------------------------------
-ATTENTION: SECURE BOOT - MOK KEY ENROLLMENT REQUIRED
+    if ! mokutil --list-enrolled 2>/dev/null | grep -q "CN=akmods"; then
+        MOK_PASSWORD=$(generate_mok_password)
+        if [ -n "$MOK_PASSWORD" ]; then
+            echo "--- Queueing akmods MOK key for Secure Boot enrollment ---"
+            if echo -e "$MOK_PASSWORD\n$MOK_PASSWORD" | mokutil --import /etc/pki/akmods/certs/public_key.der 2>/dev/null; then
+                cat << EOF
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔐 SECURE BOOT - MOK KEY ENROLLMENT REQUIRED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 The akmods signing key has been queued for enrollment.
-Your temporary MOK password is: $MOK_PASSWORD
+Your MOK password is: $MOK_PASSWORD
 
-To complete the setup:
-1. Reboot your computer.
-2. At the blue 'MOK Manager' screen that appears on boot,
-   select 'Enroll MOK' and follow the prompts.
-3. Enter the password shown above: $MOK_PASSWORD
+To complete setup:
+1. REBOOT your computer
+2. At the blue 'MOK Manager' screen during boot:
+   → Select 'Enroll MOK'
+   → Enter password: $MOK_PASSWORD
+   → Confirm enrollment
 
-After the reboot, the module will load automatically for all
-future kernel updates.
-------------------------------------------------------------------
+After reboot, CoreFreq will work automatically with all kernel updates.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 EOF
+            fi
+        fi
     fi
 fi
 
-# 2. Enable and start service
+# 2. Enable systemd service
 %systemd_post corefreqd.service
 systemctl enable corefreqd.service >/dev/null 2>&1 || true
 
 # 3. Trigger akmod build for current kernel
 if [ -x %{_bindir}/akmods ]; then
-    echo "Building kernel module for current kernel..."
-    %{_bindir}/akmods --kernels "$(uname -r)" --akmod %{name} || true
+    echo "🔨 Building kernel module for $(uname -r)..."
+    # Force rebuild and show output for debugging
+    %{_bindir}/akmods --akmod %{name} --kernels "$(uname -r)" --force || {
+        echo "❌ Akmod build failed. Checking logs..."
+        if [ -f /var/cache/akmods/%{name}/*.log ]; then
+            echo "Last few lines from akmod log:"
+            tail -10 /var/cache/akmods/%{name}/*.log 2>/dev/null || true
+        fi
+    }
 fi
 
-# 4. Try to load the kernel module if it was built successfully
-if [ -f "/lib/modules/$(uname -r)/extra/corefreqk.ko" ]; then
+# 4. Try to load and start if successful
+module_loaded=false
+if [ -f "/lib/modules/$(uname -r)/extra/corefreqk.ko" ] || [ -f "/lib/modules/$(uname -r)/updates/corefreqk.ko" ]; then
     /sbin/depmod -a "$(uname -r)" 2>/dev/null || true
-    /sbin/modprobe corefreqk >/dev/null 2>&1 || true
+    if /sbin/modprobe corefreqk >/dev/null 2>&1; then
+        module_loaded=true
+        systemctl start corefreqd.service >/dev/null 2>&1 || true
+    fi
 fi
 
-# 5. Start service if module is loaded
-if lsmod | grep -q corefreqk; then
-    systemctl start corefreqd.service >/dev/null 2>&1 || true
-fi
-
-# 6. User feedback
+# 5. User feedback
+echo ""
 if systemctl is-active --quiet corefreqd.service; then
-    echo "✅ CoreFreq is ready! Use: corefreq-cli -Oa -t frequency"
-elif lsmod | grep -q corefreqk; then
+    echo "✅ CoreFreq is running! Try: corefreq-cli -t"
+elif $module_loaded; then
     echo "✅ CoreFreq module loaded! Starting service..."
-    echo "   Use: corefreq-cli -Oa -t frequency"
+    echo "   Try: corefreq-cli -t"
+elif [ -f /sys/firmware/efi/efivars/SecureBoot-* ] && [ "$(cat /sys/firmware/efi/efivars/SecureBoot-* 2>/dev/null | tail -c 1 | od -An -tu1)" = " 1" ]; then
+    echo "🔐 CoreFreq installed! Please reboot to enroll MOK key for Secure Boot."
+    echo "   After reboot: corefreq-cli -t"
 else
-    echo "✅ CoreFreq installed! Module will build on next kernel update or reboot."
+    echo "✅ CoreFreq installed! Module will build automatically."
     echo "   Manual build: sudo akmods --akmod corefreq"
-    echo "   Then use: corefreq-cli -Oa -t frequency"
+    echo "   Usage: corefreq-cli -t"
 fi
+echo ""
 
 %preun
 %systemd_preun corefreqd.service
 if [ $1 -eq 0 ]; then # Final uninstall only
     systemctl stop corefreqd.service >/dev/null 2>&1 || true
-    modprobe -r corefreqk >/dev/null 2>&1 || true
+    /sbin/modprobe -r corefreqk >/dev/null 2>&1 || true
 fi
 
 %postun
@@ -160,8 +208,8 @@ nohup %{_bindir}/akmods --from-akmod-posttrans --akmod %{name} --kernels "%{?ker
 %preun -n akmod-%{name}
 # Remove all versions of the module
 if [ $1 -eq 0 ]; then # Final uninstall only
-    for kver in $(find /lib/modules -name "corefreqk.ko" -exec dirname {} \; | sed 's|.*/modules/||;s|/.*||' | sort -u); do
-        rm -f "/lib/modules/$kver/extra/corefreqk.ko" 2>/dev/null || true
+    for kver in $(find /lib/modules -name "corefreqk.ko" -exec dirname {} \; 2>/dev/null | sed 's|.*/modules/||;s|/.*||' | sort -u); do
+        rm -f "/lib/modules/$kver/extra/corefreqk.ko" "/lib/modules/$kver/updates/corefreqk.ko" 2>/dev/null || true
         /sbin/depmod -a "$kver" 2>/dev/null || true
     done
 fi
@@ -180,12 +228,21 @@ fi
 # Common files for kmod packages (empty for this package)
 
 %changelog
-* Mon Sep 06 2025 - Release 8.1
+* Mon Sep 06 2025 - Release 9 (alpha4)
+- Enhanced MOK password generation with better security
+- Improved Secure Boot detection and user messaging  
+- Added basic validation tests for built binaries
+- Better error handling in akmod source packaging
+- Enhanced user feedback with status icons and formatting
+- Added cleanup for both extra/ and updates/ module locations
+
+* Mon Sep 06 2025 - Release 8.1 (alpha3)
 - Fixed akmod source packaging path
 - Improved MOK password generation
 - Enhanced module loading logic
 - Better error handling in post scripts
-* Sat Aug 30 2025 - Release 8
+
+* Sat Aug 30 2025 - Release 8 (alpha2)
 - Converted from DKMS to akmod format for COPR
 - NVIDIA-style full automation with akmod integration
 - Auto-enrolls akmods MOK key with predictable password
