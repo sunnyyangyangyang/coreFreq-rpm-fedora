@@ -106,10 +106,8 @@ tar -czf %{buildroot}%{_usrsrc}/akmods/%{name}-kmod-%{version}.tar.gz \
     --exclude='*.spec' \
     -C %{_builddir}/CoreFreq-%{version} .
 
-%install -n akmod-%{name}
-# Create the ABSOLUTE .latest symlink that akmods requires for discovery.
-# This file will now correctly belong to the 'akmod-corefreq' package.
 ln -s %{_usrsrc}/akmods/%{name}-kmod-%{version}.tar.gz %{buildroot}%{_usrsrc}/akmods/%{name}-kmod.latest
+
 
 %check
 # Basic validation of built binaries (fixed to use correct path)
@@ -220,7 +218,6 @@ fi
 
 %files -n akmod-%{name}
 %{_usrsrc}/akmods/%{name}-kmod-%{version}.tar.gz
-# Add the new symlink to the file list
 %{_usrsrc}/akmods/%{name}-kmod.latest
 
 %files kmod-common
