@@ -9,7 +9,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        1.alpha10%{?dist}
+Release:        1.alpha11%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -72,6 +72,35 @@ This package provides the common files for the %{name} kernel modules.
 # Replace original Makefile with akmod-compatible version
 cp %{SOURCE2} Makefile
 
+cat << EOF > corefreq-kmod.spec
+%global kmod_name corefreq
+Name:          %{kmod_name}-kmod
+Version:       %{corefreq_version}
+Release:       1\%{?dist}
+Summary:       The %{kmod_name} kernel module
+License:       GPL-2.0-only
+URL:           %{url}
+Source0:       %{SOURCE0}
+Source1:       %{SOURCE2}
+BuildRequires: kmodtool
+BuildRequires: gcc make
+\%kmod_pkg
+%description
+This package provides the %{kmod_name} kernel module.
+%prep
+\%autosetup -n CoreFreq-%{version} -p1
+cp %{SOURCE1} Makefile
+%build
+\%make_kmod
+%install
+\%install_kmod
+%changelog
+* Sun Sep 07 2025 Packager - %{corefreq_version}-1
+- Spec generated automatically by corefreq-akmod.spec
+EOF
+
+cp corefreq-kmod.spec CoreFreq-%{version}/
+
 %build
 # Build userspace tools only (kernel module built by akmod)
 make %{?_smp_mflags} userspace
@@ -98,15 +127,12 @@ tar -czf %{buildroot}%{_usrsrc}/akmods/%{name}-kmod-%{version}.tar.gz \
     --exclude='*.o' \
     --exclude='*.ko' \
     --exclude='*.mod.*' \
-    --exclude='.tmp_versions' \
-    --exclude='Module.symvers' \
-    --exclude='modules.order' \
     --exclude='.git*' \
     --exclude='*.rpm' \
-    --exclude='*.spec' \
     -C %{_builddir}/CoreFreq-%{version} .
 
-ln -s %{_usrsrc}/akmods/%{name}-kmod-%{version}.tar.gz %{buildroot}%{_usrsrc}/akmods/%{name}-kmod.latest
+# Create the correct RELATIVE .latest symlink
+ln -s %{name}-kmod-%{version}.tar.gz %{buildroot}%{_usrsrc}/akmods/%{name}-kmod.latest
 
 
 %check
