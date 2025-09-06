@@ -77,23 +77,14 @@ for kernel_version in %{?kernel_versions}; do
 done
 
 %install
-# Install userspace tools
+
 install -D -m 0755 build/corefreqd %{buildroot}%{_bindir}/corefreqd
 install -D -m 0755 build/corefreq-cli %{buildroot}%{_bindir}/corefreq-cli
 install -D -m 0644 %{SOURCE1} %{buildroot}%{_unitdir}/corefreqd.service
 
-# Install kernel modules
-for kernel_version in %{?kernel_versions}; do
-    pushd _kmod_build_${kernel_version%%___*}
-    install -D -m 0755 build/corefreqk.ko %{buildroot}%{kmodinstdir_prefix}${kernel_version%%___*}%{kmodinstdir_postfix}/corefreqk.ko
-    popd
-done
+tar -czf ../%{name}-%{version}.tar.gz .
 
-# Install akmod sources
-install -d %{buildroot}%{_usrsrc}/akmods/
-tar -czf %{name}-%{version}.tar.gz --exclude='%{name}-%{version}.tar.gz' .
-rm -rf %{buildroot}%{_usrsrc}/akmods/%{name}-%{version}/_kmod_build_*
-rm -rf %{buildroot}%{_usrsrc}/akmods/%{name}-%{version}/build
+install -D -m 0644 ../%{name}-%{version}.tar.gz %{buildroot}%{_usrsrc}/akmods/%{name}-%{version}.tar.gz
 
 %post
 # === AUTOMATED DKMS + MOK SETUP (adapted for akmod) ===
