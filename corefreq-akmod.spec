@@ -10,7 +10,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        akmod-test%{?dist}
+Release:        1.alpha%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
