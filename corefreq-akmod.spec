@@ -9,7 +9,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        1.alpha7%{?dist}
+Release:        1.alpha8%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -91,7 +91,7 @@ fi
 
 # Create akmod source package
 mkdir -p %{buildroot}%{_usrsrc}/akmods/
-tar -czf %{buildroot}%{_usrsrc}/akmods/%{name}-%{version}-%{release}.tar.gz \
+tar -czf %{buildroot}%{_usrsrc}/akmods/%{name}-kmod-%{version}.tar.gz \
     --transform 's,^,%{name}-%{version}/,' \
     --exclude-vcs \
     --exclude='build/*' \
@@ -214,7 +214,7 @@ fi
 %{_unitdir}/corefreqd.service
 
 %files -n akmod-%{name}
-%{_usrsrc}/akmods/%{name}-%{version}-%{release}.tar.gz
+%{_usrsrc}/akmods/%{name}-kmod-%{version}.tar.gz
 
 %files kmod-common
 # Common files for kmod packages (empty for this package)
