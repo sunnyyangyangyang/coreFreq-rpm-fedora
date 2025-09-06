@@ -61,11 +61,9 @@ This package provides the common files for the %{name} kernel modules.
 
 %prep
 %autosetup -n CoreFreq-%{version} -p1
-
-# Replace original Makefile with akmod-compatible version
 cp %{SOURCE2} Makefile
 cp %{SOURCE3} corefreq-kmod.spec
-cp corefreq-kmod.spec CoreFreq-%{version}/
+
 
 
 %build
