@@ -1,64 +1,69 @@
 # Filename: corefreq-kmod.spec.in
 
-# Disable debug packages
-%global _debugsource_packages 0
-%global _debuginfo_packages 0
-%global debug_package %{nil}
+%if 0%{?fedora}
+%global buildforkernels akmod
+%endif
 
+%global debug_package %{nil}
 %global kmod_name corefreq
 
-Name:          %{kmod_name}-kmod
+Name:          corefreq-kmod
 Version:       @COREFREQ_VERSION@
-Release:       @RELEASE@
-Summary:       The %{kmod_name} kernel module (corefreqk)
+Release:       @RELEASE@%{?dist}
+Summary:       CoreFreq kernel module
 
 License:       GPL-2.0-only
 URL:           https://github.com/cyring/CoreFreq
 
-Source0:       %{kmod_name}-kmod-%{version}.tar.gz
+Source0:       corefreq-kmod-%{version}.tar.gz
 
-BuildRequires: gcc make
-BuildRequires: kernel-devel
+ExclusiveArch: x86_64
 
-# This line is still ESSENTIAL because it defines %{kversion} for the %build section.
-%{expand:%(kmodtool --target %{_target_cpu} --kmodname %{kmod_name} 2>/dev/null)}
+# get the needed BuildRequires (in parts depending on what we build for)
+%global AkmodsBuildRequires %{_bindir}/kmodtool
+BuildRequires: %{AkmodsBuildRequires}
+BuildRequires: gcc, make
+
+%{!?kernels:BuildRequires: buildsys-build-rpmfusion-kerneldevpkgs-%{?buildforkernels:%{buildforkernels}}%{!?buildforkernels:current}-%{_target_cpu} }
+
+# kmodtool does its magic here
+%{expand:%(kmodtool --target %{_target_cpu} --repo rpmfusion --kmodname %{kmod_name} %{?buildforkernels:--%{buildforkernels}} %{?kernels:--for-kernels "%{?kernels}"} 2>/dev/null) }
 
 %description
-This package provides the %{kmod_name} kernel module (corefreqk.ko) for CoreFreq,
-built by the akmods system for the currently running kernel.
+The CoreFreq %{version} kernel module for kernel %{kversion}.
+CoreFreq is a CPU monitoring software designed for 64-bit processors.
 
 %prep
-%autosetup -n %{kmod_name}-kmod-%{version}
+# error out if there was something wrong with kmodtool
+%{?kmodtool_check}
+
+# print kmodtool output for debugging purposes:
+kmodtool --target %{_target_cpu} --repo rpmfusion --kmodname %{kmod_name} %{?buildforkernels:--%{buildforkernels}} %{?kernels:--for-kernels "%{?kernels}"} 2>/dev/null
+
+%setup -q -c -T -a 0
+
+for kernel_version in %{?kernel_versions} ; do
+    cp -a corefreq-kmod-%{version} _kmod_build_${kernel_version%%___*}
+done
 
 %build
-# === THE GUARANTEED FIX: PART 1 ===
-# We know %{kversion} works here. So we CAPTURE it and save it to a file.
-echo "%{kversion}" > kversion.txt
-
-# The original build command still uses the macro.
-make modules KVER=%{kversion}
+for kernel_version in %{?kernel_versions}; do
+    pushd _kmod_build_${kernel_version%%___*}/
+    %make_build \
+        KVER="${kernel_version%%___*}" \
+        KDIR="${kernel_version##*___}" \
+        modules
+    popd
+done
 
 %install
-# === THE GUARANTEED FIX: PART 2 ===
-# Step 1: Read the 100% correct kernel version from the file we just created.
-# We are now using a standard shell variable, NOT an RPM macro.
-KVER=$(cat kversion.txt)
-
-# Step 2: Create the directory using the RELIABLE shell variable $KVER.
-install -d %{buildroot}/lib/modules/$KVER/extra/%{kmod_name}/
-
-# Step 3: Install the .ko file into the CORRECT directory.
-install -m 0644 build/corefreqk.ko %{buildroot}/lib/modules/$KVER/extra/%{kmod_name}/
-
-# Step 4: Write the CORRECT, fully-expanded file path to the manifest.
-echo "/lib/modules/$KVER/extra/%{kmod_name}/corefreqk.ko" > kmod-file-list.txt
-
-%files -f kmod-file-list.txt
-# Read the file list from the manifest. This is still the most robust method.
-
-%clean
-rm -rf %{buildroot}
+for kernel_version in %{?kernel_versions}; do
+    mkdir -p $RPM_BUILD_ROOT/%{kmodinstdir_prefix}/${kernel_version%%___*}/%{kmodinstdir_postfix}/
+    install -D -m 0644 _kmod_build_${kernel_version%%___*}/corefreqk.ko \
+         $RPM_BUILD_ROOT/%{kmodinstdir_prefix}/${kernel_version%%___*}/%{kmodinstdir_postfix}/
+done
+%{?akmod_install}
 
 %changelog
 * Sun Sep 08 2025 Package Maintainer <package@example.com> - @COREFREQ_VERSION@-@RELEASE@
-- Definitive fix: Capture working %{kversion} in %build, then read it from a file in %install.
+- Follow nvidia-kmod pattern for reliable kernel module building
