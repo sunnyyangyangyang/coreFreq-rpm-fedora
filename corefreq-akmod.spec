@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        1.alpha30%{?dist}
+Release:        1.beta1{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -133,8 +133,9 @@ smart_mok_check() {
         return 1
     fi
     
-    # Check if key is already enrolled
-    if mokutil --list-enrolled 2>/dev/null | grep -q "CN=akmods"; then
+    # Check if key is already enrolled (multiple ways to detect this)
+    if mokutil --list-enrolled 2>/dev/null | grep -q "CN=akmods" || \
+       mokutil --test-key "$akmods_key" 2>&1 | grep -q "already enrolled\|SKIP.*already enrolled"; then
         echo "akmods MOK key already enrolled."
         return 0
     fi
