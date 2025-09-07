@@ -2,6 +2,10 @@
 # This is the "inner" spec file template used by the akmods system.
 # It is used to build a Source RPM (.src.rpm) that akmodsbuild can process.
 
+%global _debugsource_packages 0
+%global _debuginfo_packages 0
+%global debug_package %{nil}
+
 %global kmod_name corefreq
 
 Name:          %{kmod_name}-kmod
