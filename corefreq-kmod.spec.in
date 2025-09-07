@@ -1,9 +1,9 @@
-# Filename: corefreq-kmod.spec
-# This is the "inner" spec file used by the akmods system on the user's machine.
-# It is NOT built directly by COPR.
+# Filename: corefreq-kmod.spec.in
+# This is the "inner" spec file template used by the akmods system.
+# Variables are replaced during the akmod package build process.
 
 %global kmod_name corefreq
-%global corefreq_version 2.0.8
+%global corefreq_version @COREFREQ_VERSION@
 
 Name:          %{kmod_name}-kmod
 Version:       %{corefreq_version}
@@ -13,33 +13,32 @@ Summary:       The %{kmod_name} kernel module for CoreFreq
 License:       GPL-2.0-only
 URL:           https://github.com/cyring/CoreFreq
 
-# The sources will be provided by the akmods system from the tarball.
-Source0:       %{kmod_name}-%{version}.tar.gz
-Source1:       Makefile.akmod
-
-BuildRequires: kmodtool
+# The sources are provided by the akmods system from the extracted tarball
 BuildRequires: gcc make
 BuildRequires: kernel-devel
 
-# This is the standard macro for building kmod packages.
-%kmod_pkg
+# Use proper kmod package generation
+%{expand:%(kmodtool --target %{_target_cpu} --kmodname %{kmod_name} 2>/dev/null) }
 
 %description
-This package provides the %{kmod_name} kernel module, built by the akmods system.
+This package provides the %{kmod_name} kernel module (corefreqk.ko) for CoreFreq,
+built by the akmods system for the currently running kernel.
 
 %prep
-%autosetup -n CoreFreq-%{version} -p1
-# Replace the original Makefile with our akmod-compatible one.
-cp %{SOURCE1} Makefile
+# The source is already extracted by akmods, we just need to set up the build
+%setup -q -n corefreq-kmod-%{version}
+cp Makefile.akmod Makefile
 
 %build
-# Standard macro to build the kernel module.
-%make_kmod
+# Build the kernel module for the current kernel
+%{kmod_make}
 
 %install
-# Standard macro to install the built kernel module.
-%install_kmod
+# Install the built kernel module
+%{kmod_install}
 
 %changelog
-* Mon Sep 08 2025 Your Name <your@email.com> - 2.0.8-1
-- Initial spec for building the kmod via akmods.
+* Sun Sep 08 2025 Package Maintainer <package@example.com> - 2.0.8-1
+- Updated to use proper kmodtool macros for akmod compatibility
+- Fixed source setup and build process for akmods system
+- Ensure module builds correctly for current kernel version

@@ -9,7 +9,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        1.alpha15%{?dist}
+Release:        1.alpha17%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -17,7 +17,6 @@ URL:            https://github.com/cyring/CoreFreq
 Source0:        %{url}/archive/refs/tags/%{version}.tar.gz#/%{name}-%{version}.tar.gz
 Source1:        corefreqd.service
 Source2:        Makefile.akmod
-# EDITED: Add the inner spec file as a new source.
 Source3:        corefreq-kmod.spec.in
 
 # Akmod BuildRequires
@@ -31,7 +30,6 @@ BuildRequires:  kernel-devel
 Requires:       systemd
 Suggests:       mokutil
 Requires:       %{name}-kmod >= %{version}
-
 
 # Generate akmod metadata
 %{expand:%(kmodtool --target %{_target_cpu} --kmodname %{name} --pattern ".*" %{?buildforkernels:--%{buildforkernels}} %{?kernels:--for-kernels "%{?kernels}"} 2>/dev/null) }
@@ -62,9 +60,12 @@ This package provides the common files for the %{name} kernel modules.
 %prep
 %autosetup -n CoreFreq-%{version} -p1
 cp %{SOURCE2} Makefile
-cp %{SOURCE3} corefreq-kmod.spec
 
-
+# Process the kmod spec template - replace variables
+sed -e 's|@COREFREQ_VERSION@|%{corefreq_version}|g' \
+    -e 's|@VERSION@|%{version}|g' \
+    -e 's|@RELEASE@|%{release}|g' \
+    %{SOURCE3} > corefreq-kmod.spec
 
 %build
 # Build userspace tools only (kernel module built by akmod)
@@ -78,27 +79,42 @@ install -D -m 0755 build/corefreq-cli %{buildroot}%{_bindir}/corefreq-cli
 # Install systemd service
 install -D -m 0644 %{SOURCE1} %{buildroot}%{_unitdir}/corefreqd.service
 
-# Create akmod source package
+# Create akmod source package with proper structure
 mkdir -p %{buildroot}%{_usrsrc}/akmods/
+
+# Create a temporary directory for packaging
+AKMOD_TEMP=$(mktemp -d)
+AKMOD_SOURCE="$AKMOD_TEMP/corefreq-kmod-%{version}"
+
+# Copy source tree
+cp -r %{_builddir}/CoreFreq-%{version} "$AKMOD_SOURCE"
+
+# Add the processed spec file and Makefile to the source tree
+cp corefreq-kmod.spec "$AKMOD_SOURCE/"
+cp %{SOURCE2} "$AKMOD_SOURCE/Makefile.akmod"
+
+# Create the tarball with the correct structure
 tar -czf %{buildroot}%{_usrsrc}/akmods/%{name}-kmod-%{version}.tar.gz \
+    -C "$AKMOD_TEMP" \
     --exclude-vcs \
     --exclude='build/*' \
     --exclude='*.o' \
     --exclude='*.ko' \
-    -C %{_builddir} CoreFreq-%{version}
+    corefreq-kmod-%{version}
 
+# Create the latest symlink
 ln -s %{name}-kmod-%{version}.tar.gz %{buildroot}%{_usrsrc}/akmods/%{name}-kmod.latest
 
+# Cleanup
+rm -rf "$AKMOD_TEMP"
 
 %check
-# Basic validation of built binaries (fixed to use correct path)
+# Basic validation of built binaries
 if ! %{buildroot}%{_bindir}/corefreqd -h >/dev/null 2>&1; then
-    echo "ERROR: corefreqd help test failed"
-    # Don't fail build for this - some binaries need privileged access
+    echo "WARNING: corefreqd help test failed (may need privileged access)"
 fi
 if ! %{buildroot}%{_bindir}/corefreq-cli -h >/dev/null 2>&1; then
-    echo "ERROR: corefreq-cli help test failed"
-    # Don't fail for this - some binaries need privileged access
+    echo "WARNING: corefreq-cli help test failed (may need privileged access)"
 fi
 
 %post
@@ -146,14 +162,9 @@ fi
 %systemd_post corefreqd.service
 systemctl enable corefreqd.service >/dev/null 2>&1 || true
 
-# REMOVED: The entire block that tried to build the module prematurely.
-# The build is now correctly handled by the %post scriptlet of the
-# akmod-corefreq package itself.
-
-# CHANGED: Updated user feedback to be accurate.
 echo ""
 echo "✅ CoreFreq installed!"
-echo "   The kernel module will now be built automatically in the background."
+echo "   The kernel module will be built automatically in the background."
 echo "   The service will start once the module is ready."
 echo ""
 if [ -f /sys/firmware/efi/efivars/SecureBoot-* ] && [ "$(cat /sys/firmware/efi/efivars/SecureBoot-* 2>/dev/null | tail -c 1 | od -An -tu1)" = " 1" ]; then
@@ -165,7 +176,6 @@ echo "   To check status: systemctl status corefreqd.service"
 echo "   Once running, use: corefreq-cli -t"
 echo ""
 
-
 %preun
 %systemd_preun corefreqd.service
 if [ $1 -eq 0 ]; then # Final uninstall only
@@ -176,7 +186,6 @@ fi
 %postun
 %systemd_postun_with_restart corefreqd.service
 
-# THIS IS THE CORRECT PLACE TO TRIGGER THE BUILD
 %post -n akmod-%{name}
 # Trigger akmod build
 nohup %{_bindir}/akmods --from-akmod-posttrans --akmod %{name} --kernels "%{?kernel_versions}" &> /dev/null &
@@ -205,34 +214,14 @@ fi
 # Common files for kmod packages (empty for this package)
 
 %changelog
-* Sun Sep 01 2025 Package Maintainer <package@example.com> - 2.0.8-1.alpha7
+* Sun Sep 08 2025 Package Maintainer <package@example.com> - 2.0.8-1.alpha16
+- Fixed akmod source packaging structure
+- Process kmod spec template variables during build
+- Ensure proper directory structure in akmod tarball
+- Fixed source file placement for akmod system
+
+* Sun Sep 01 2025 Package Maintainer <package@example.com> - 2.0.8-1.alpha15
 - Fix akmod build trigger by moving it to the akmod subpackage post-install scriptlet
 - Remove premature build attempt from main package post-install scriptlet
 - Adjust user feedback messages for accuracy during installation
 - Add explicit 'Requires: corefreq-kmod' to main package for dependency clarity
-
-* Sat Aug 30 2025 Package Maintainer <package@example.com> - 2.0.8-1.alpha6
-- Fixed changelog dates for COPR compatibility
-- Improved %check section to not fail on privilege-dependent binaries
-- Enhanced error handling in binary validation
-
-* Sat Aug 30 2025 Package Maintainer <package@example.com> - 2.0.8-1.alpha5
-- Enhanced MOK password generation with better security
-- Improved Secure Boot detection and user messaging  
-- Added basic validation tests for built binaries
-- Better error handling in akmod source packaging
-- Enhanced user feedback with status icons and formatting
-- Added cleanup for both extra/ and updates/ module locations
-
-* Sat Aug 30 2025 Package Maintainer <package@example.com> - 2.0.8-1.alpha4
-- Fixed akmod source packaging path
-- Improved MOK password generation
-- Enhanced module loading logic
-- Better error handling in post scripts
-
-* Sat Aug 30 2025 Package Maintainer <package@example.com> - 2.0.8-1.alpha3
-- Converted from DKMS to akmod format for COPR
-- NVIDIA-style full automation with akmod integration
-- Auto-enrolls akmods MOK key with predictable password
-- Enhanced service with akmod integration and retry logic
-- Optimized for COPR build environment
