@@ -1,7 +1,6 @@
 # Filename: corefreq-kmod.spec.in
-# This is the "inner" spec file template used by the akmods system.
-# It is used to build a Source RPM (.src.rpm) that akmodsbuild can process.
 
+# Disable debug packages
 %global _debugsource_packages 0
 %global _debuginfo_packages 0
 %global debug_package %{nil}
@@ -16,13 +15,12 @@ Summary:       The %{kmod_name} kernel module (corefreqk)
 License:       GPL-2.0-only
 URL:           https://github.com/cyring/CoreFreq
 
-# This Source0 is created and packaged by the main akmod spec file
 Source0:       %{kmod_name}-kmod-%{version}.tar.gz
 
 BuildRequires: gcc make
 BuildRequires: kernel-devel
 
-# Use kmodtool to generate the kernel version specific package info
+# This line defines the %{kversion} macro for us.
 %{expand:%(kmodtool --target %{_target_cpu} --kmodname %{kmod_name} 2>/dev/null)}
 
 %description
@@ -30,25 +28,20 @@ This package provides the %{kmod_name} kernel module (corefreqk.ko) for CoreFreq
 built by the akmods system for the currently running kernel.
 
 %prep
-# Unpack the source tarball provided by the main akmod package.
-# The tarball contains a single top-level directory: corefreq-kmod-%{version}
 %autosetup -n %{kmod_name}-kmod-%{version}
 
 %build
-# Use the akmod-compatible Makefile provided in the source
-# Build the kernel module for the target kernel version
+# This proves %{kversion} is the correct macro defined by kmodtool.
 make modules KVER=%{kversion}
 
 %install
-# Create the destination directory for the kernel module
-install -d %{buildroot}/lib/modules/%{kernel_version}/extra/%{kmod_name}/
-
-# The compiled module is located in the 'build' subdirectory
+# === THE FINAL FIX ===
+# Use %{kversion} consistently and without single quotes for all paths.
+install -d %{buildroot}/lib/modules/%{kversion}/extra/%{kmod_name}/
 install -m 0644 build/corefreqk.ko %{buildroot}/lib/modules/%{kversion}/extra/%{kmod_name}/
 
 %files
-# This package owns only the kernel module file itself.
-# kmodtool creates the correct Provides/Requires for the specific kernel.
+# Use %{kversion} here as well.
 /lib/modules/%{kversion}/extra/%{kmod_name}/corefreqk.ko
 
 %clean
@@ -56,4 +49,4 @@ rm -rf %{buildroot}
 
 %changelog
 * Sun Sep 08 2025 Package Maintainer <package@example.com> - @COREFREQ_VERSION@-@RELEASE@
-- Initial SRPM build for akmods system.
+- Corrected macro usage to be consistently %{kversion} for all paths.
