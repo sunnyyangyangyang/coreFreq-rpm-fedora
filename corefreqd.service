@@ -6,6 +6,8 @@ Wants=akmods.service
 # Ensure we start after basic system initialization
 After=basic.target sysinit.target
 Before=multi-user.target
+StartLimitBurst=3
+StartLimitIntervalSec=300
 
 [Service]
 Type=simple
@@ -24,7 +26,7 @@ ExecStartPre=/bin/bash -c '\
     # Function to find module file \
     find_module() { \
         local kver=$(uname -r); \
-        for path in "/lib/modules/$kver/extra/corefreqk.ko" "/lib/modules/$kver/updates/corefreqk.ko" "/lib/modules/$kver/kernel/drivers/misc/corefreqk.ko"; do \
+        for path in "/lib/modules/$kver/extra/corefreq/corefreqk.ko" "/lib/modules/$kver/updates/corefreqk.ko" "/lib/modules/$kver/kernel/drivers/misc/corefreqk.ko"; do \
             [ -f "$path" ] && echo "$path" && return 0; \
         done; \
         return 1; \
@@ -107,8 +109,6 @@ ExecStopPost=-/bin/bash -c '\
 # Service behavior
 Restart=on-failure
 RestartSec=10
-StartLimitBurst=3
-StartLimitIntervalSec=300
 
 # Extended timeouts for akmod builds and Secure Boot scenarios
 TimeoutStartSec=180

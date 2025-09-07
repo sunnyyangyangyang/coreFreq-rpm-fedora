@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        1.alpha28%{?dist}
+Release:        1.alpha30%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -108,59 +108,85 @@ ln -s "$SRPM_NAME" %{buildroot}%{_usrsrc}/akmods/%{name}-kmod.latest
 # 7. Clean up the temporary directory
 rm -rf "$SRPM_TOPDIR"
 
-
 %post
-# === AUTOMATED AKMOD + MOK SETUP ===
-# (scriptlets remain unchanged)
-# Function to generate secure password
-generate_mok_password() {
-    if command -v openssl >/dev/null 2>&1; then
-        openssl rand -hex 12 2>/dev/null
-    else
-        printf "%012x" $((RANDOM * RANDOM * RANDOM)) 2>/dev/null
+# === SMART MOK DETECTION AND SETUP ===
+smart_mok_check() {
+    local akmods_key="/etc/pki/akmods/certs/public_key.der"
+    local pending_keys="/var/lib/mokutil/request"
+    local secure_boot_enabled=false
+    
+    # Check if Secure Boot is enabled
+    if [ -d /sys/firmware/efi/efivars ]; then
+        if mokutil --sb-state 2>/dev/null | grep -q "SecureBoot enabled"; then
+            secure_boot_enabled=true
+        fi
     fi
-}
-if [ -f /etc/pki/akmods/certs/public_key.der ] && command -v mokutil >/dev/null 2>&1; then
-    if ! mokutil --list-enrolled 2>/dev/null | grep -q "CN=akmods"; then
-        MOK_PASSWORD=$(generate_mok_password)
-        if [ -n "$MOK_PASSWORD" ]; then
-            echo "--- Queueing akmods MOK key for Secure Boot enrollment ---"
-            if echo -e "$MOK_PASSWORD\n$MOK_PASSWORD" | mokutil --import /etc/pki/akmods/certs/public_key.der 2>/dev/null; then
-                cat << EOF
+    
+    # Only proceed if Secure Boot is enabled
+    if [ "$secure_boot_enabled" = "false" ]; then
+        return 0
+    fi
+    
+    # Check if akmods key exists
+    if [ ! -f "$akmods_key" ]; then
+        echo "Warning: akmods signing key not found. Module signing may fail."
+        return 1
+    fi
+    
+    # Check if key is already enrolled
+    if mokutil --list-enrolled 2>/dev/null | grep -q "CN=akmods"; then
+        echo "akmods MOK key already enrolled."
+        return 0
+    fi
+    
+    # Check if there are pending MOK requests
+    if [ -d "$pending_keys" ] && [ -n "$(ls -A "$pending_keys" 2>/dev/null)" ]; then
+        cat << 'EOF'
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔐 SECURE BOOT - MOK KEY ENROLLMENT REQUIRED
+🔐 MOK KEY ENROLLMENT PENDING
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-The akmods signing key has been queued for enrollment.
-Your MOK password is: $MOK_PASSWORD
+You have pending MOK (Machine Owner Key) enrollments.
 
-To complete setup:
+To complete enrollment:
 1. REBOOT your computer
 2. At the blue 'MOK Manager' screen during boot:
    → Select 'Enroll MOK'
-   → Enter password: $MOK_PASSWORD
+   → Enter the password you provided
    → Confirm enrollment
 
-After reboot, CoreFreq will work automatically with all kernel updates.
+If you need to enroll the akmods key manually:
+  sudo mokutil --import /etc/pki/akmods/certs/public_key.der
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 EOF
-            fi
-        fi
+        return 0
     fi
-fi
+    
+    # If no pending requests and key not enrolled, show manual enrollment
+    cat << 'EOF'
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔐 SECURE BOOT DETECTED - MOK ENROLLMENT REQUIRED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+To use CoreFreq with Secure Boot, enroll the akmods signing key:
+
+  sudo mokutil --import /etc/pki/akmods/certs/public_key.der
+
+Then REBOOT and follow the on-screen MOK Manager instructions.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EOF
+}
+
+# Run smart MOK check
+smart_mok_check
+
 %systemd_post corefreqd.service
 systemctl enable corefreqd.service >/dev/null 2>&1 || true
 echo ""
-echo "✅ CoreFreq installed!"
-echo "   The kernel module will be built automatically in the background."
-echo "   The service will start once the module is ready."
+echo "CoreFreq installed successfully!"
+echo "The kernel module will be built automatically in the background."
+echo "The service will start once the module is ready."
 echo ""
-if [ -f /sys/firmware/efi/efivars/SecureBoot-* ] && [ "$(cat /sys/firmware/efi/efivars/SecureBoot-* 2>/dev/null | tail -c 1 | od -An -tu1)" = " 1" ]; then
-    echo "🔐 Secure Boot is enabled. If you see MOK enrollment messages,"
-    echo "   please reboot and follow the on-screen instructions."
-fi
-echo ""
-echo "   To check status: systemctl status corefreqd.service"
-echo "   Once running, use: corefreq-cli"
+echo "To check status: systemctl status corefreqd.service"
+echo "Once running, use: corefreq-cli"
 echo ""
 
 %preun
@@ -172,6 +198,21 @@ fi
 
 %postun
 %systemd_postun_with_restart corefreqd.service
+
+# === KERNEL UPDATE TRIGGERS FOR AUTOMATIC REBUILDS ===
+%triggerin -- kernel kernel-core kernel-devel kernel-modules kernel-modules-core
+echo "Kernel update detected, rebuilding CoreFreq module..."
+if [ -x /usr/bin/akmods ]; then
+    # Run in background to avoid blocking the transaction
+    nohup sh -c 'sleep 5; /usr/bin/akmods --akmod %{name} --force' >/dev/null 2>&1 &
+fi
+
+%triggerpostun -- kernel kernel-core kernel-devel kernel-modules kernel-modules-core
+echo "Kernel removal detected, cleaning up CoreFreq modules..."
+if [ -x /usr/bin/akmods ]; then
+    # Clean up modules for removed kernels
+    /usr/bin/akmods --remove %{name} >/dev/null 2>&1 || true
+fi
 
 %post -n akmod-%{name}
 # Trigger akmod build
@@ -202,15 +243,9 @@ fi
 # This package is empty but serves as a dependency anchor
 
 %changelog
-* Sun Sep 08 2025 Package Maintainer <package@example.com> - 2.0.8-1.alpha20
-- Switched to building an SRPM for akmods instead of a tarball
-- Corrected akmodsbuild usage which expects a .src.rpm file
-- Reworked %install section to use rpmbuild -bs for kmod source
-- Updated %files section for akmod subpackage to include the SRPM
-- This should resolve the "cannot be installed" error
-
-* Sun Sep 08 2025 Package Maintainer <package@example.com> - 2.0.8-1.alpha19
-- Fixed akmod inner spec file with working build and install sections
-- Added proper %files section to prevent unpackaged files error
-- Corrected directory structure handling for rpmbuild
-- Successfully tested kernel module build process
+* Sat Sep 07 2025 Package Maintainer <package@example.com> - 2.0.8-1.alpha28
+- Added kernel update triggers for automatic module rebuilds
+- Improved MOK detection logic - checks actual enrollment status and pending requests
+- Removed automatic password generation and MOK enrollment
+- Now provides clear manual instructions for MOK enrollment when needed
+- Added triggers for kernel-modules and kernel-modules-core packages
