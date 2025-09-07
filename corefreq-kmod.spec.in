@@ -31,22 +31,33 @@ built by the akmods system for the currently running kernel.
 %autosetup -n %{kmod_name}-kmod-%{version}
 
 %build
-# This proves %{kversion} is the correct macro defined by kmodtool.
+# The %build section works correctly with %{kversion}
 make modules KVER=%{kversion}
 
 %install
-# === THE FINAL FIX ===
-# Use %{kversion} consistently and without single quotes for all paths.
+# The %install section is a shell script, so macros are expanded correctly here.
+# 1. Create the correct directory using the expanded macro.
 install -d %{buildroot}/lib/modules/%{kversion}/extra/%{kmod_name}/
+
+# 2. Install the kernel module into the correct directory.
 install -m 0644 build/corefreqk.ko %{buildroot}/lib/modules/%{kversion}/extra/%{kmod_name}/
 
-%files
-# Use %{kversion} here as well.
-/lib/modules/%{kversion}/extra/%{kmod_name}/corefreqk.ko
+# === THE DEFINITIVE FIX ===
+# 3. Since the %files section fails to expand the macro, we write the
+#    correct, fully-expanded file path into a manifest file.
+#    This file will be read by the %files section later.
+echo "/lib/modules/%{kversion}/extra/%{kmod_name}/corefreqk.ko" > kmod-file-list.txt
+
+%files -f kmod-file-list.txt
+# === THE DEFINITIVE FIX ===
+# The -f flag tells RPM to read the list of files from the manifest file
+# we created in the %install section. This completely bypasses the macro
+# expansion problem in the %files section itself.
+# We leave this section empty except for the line above.
 
 %clean
 rm -rf %{buildroot}
 
 %changelog
 * Sun Sep 08 2025 Package Maintainer <package@example.com> - @COREFREQ_VERSION@-@RELEASE@
-- Corrected macro usage to be consistently %{kversion} for all paths.
+- Final fix: Use a manifest file generated in %install to bypass macro expansion issues in %files.
