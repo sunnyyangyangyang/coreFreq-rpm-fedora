@@ -59,11 +59,11 @@ done
 %install
 for kernel_version in %{?kernel_versions}; do
     mkdir -p $RPM_BUILD_ROOT/%{kmodinstdir_prefix}/${kernel_version%%___*}/%{kmodinstdir_postfix}/
-    install -D -m 0644 _kmod_build_${kernel_version%%___*}/corefreqk.ko \
+    install -D -m 0644 _kmod_build_${kernel_version%%___*}/build/corefreqk.ko \
          $RPM_BUILD_ROOT/%{kmodinstdir_prefix}/${kernel_version%%___*}/%{kmodinstdir_postfix}/
 done
 %{?akmod_install}
 
 %changelog
-* Sun Sep 08 2025 Package Maintainer <package@example.com> - @COREFREQ_VERSION@-@RELEASE@
+* Sat Sep 07 2025 Package Maintainer <package@example.com> - @COREFREQ_VERSION@-@RELEASE@
 - Follow nvidia-kmod pattern for reliable kernel module building
