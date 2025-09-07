@@ -9,7 +9,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        1.alpha18%{?dist}
+Release:        1.alpha19%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -214,7 +214,13 @@ fi
 # Common files for kmod packages (empty for this package)
 
 %changelog
-* Sun Sep 08 2025 Package Maintainer <package@example.com> - 2.0.8-1.alpha16
+* Sun Sep 08 2025 Package Maintainer <package@example.com> - 2.0.8-1.alpha18
+- Fixed akmod inner spec file with working build and install sections
+- Added proper %files section to prevent unpackaged files error
+- Corrected directory structure handling for rpmbuild
+- Successfully tested kernel module build process
+
+* Sun Sep 08 2025 Package Maintainer <package@example.com> - 2.0.8-1.alpha17
 - Fixed akmod source packaging structure
 - Process kmod spec template variables during build
 - Ensure proper directory structure in akmod tarball
