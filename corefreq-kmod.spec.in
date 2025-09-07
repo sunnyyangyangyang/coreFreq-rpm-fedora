@@ -41,7 +41,7 @@ make modules KVER=%{kversion}
 
 %install
 # Create the destination directory for the kernel module
-install -d %{buildroot}/lib/modules/%{kversion}/extra/%{kmod_name}/
+install -d %{buildroot}/lib/modules/%{kernel_version}/extra/%{kmod_name}/
 
 # The compiled module is located in the 'build' subdirectory
 install -m 0644 build/corefreqk.ko %{buildroot}/lib/modules/%{kversion}/extra/%{kmod_name}/

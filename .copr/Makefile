@@ -2,7 +2,7 @@
 # This file should be placed at .copr/Makefile in your COPR repository
 
 VERSION = 2.0.8
-RELEASE = 1.alpha21
+RELEASE = 1.alpha22
 SPEC_FILE = corefreq-akmod.spec
 
 # COPR requires this target
