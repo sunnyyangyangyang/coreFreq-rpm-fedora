@@ -1,5 +1,5 @@
-# Filename: corefreq-kmod.spec.in
-# This is the "inner" spec file template used by the akmods system.
+# Filename: corefreq-kmod.spec.in  
+# This is the "inner" spec file used by the akmods system.
 # Variables are replaced during the akmod package build process.
 
 %global kmod_name corefreq
@@ -13,32 +13,35 @@ Summary:       The %{kmod_name} kernel module for CoreFreq
 License:       GPL-2.0-only
 URL:           https://github.com/cyring/CoreFreq
 
-# The sources are provided by the akmods system from the extracted tarball
 BuildRequires: gcc make
 BuildRequires: kernel-devel
 
-# Use proper kmod package generation
-%{expand:%(kmodtool --target %{_target_cpu} --kmodname %{kmod_name} 2>/dev/null) }
+# Use kmodtool to generate the kernel version specific package info
+%{expand:%(kmodtool --target %{_target_cpu} --kmodname %{kmod_name} 2>/dev/null)}
 
 %description
 This package provides the %{kmod_name} kernel module (corefreqk.ko) for CoreFreq,
 built by the akmods system for the currently running kernel.
 
 %prep
-# The source is already extracted by akmods, we just need to set up the build
+# The source is already extracted by akmods, we just need to set up
 %setup -q -n corefreq-kmod-%{version}
 cp Makefile.akmod Makefile
 
 %build
 # Build the kernel module for the current kernel
-%{kmod_make}
+make %{?_smp_mflags} modules
 
 %install
-# Install the built kernel module
-%{kmod_install}
+# Install the kernel module
+mkdir -p %{buildroot}/lib/modules/%{kversion}/extra/%{kmod_name}/
+install -m 0644 *.ko %{buildroot}/lib/modules/%{kversion}/extra/%{kmod_name}/
+
+%clean
+rm -rf %{buildroot}
 
 %changelog
 * Sun Sep 08 2025 Package Maintainer <package@example.com> - 2.0.8-1
-- Updated to use proper kmodtool macros for akmod compatibility
-- Fixed source setup and build process for akmods system
+- Updated to use standard make commands instead of undefined kmod macros
+- Fixed module installation path for akmod compatibility
 - Ensure module builds correctly for current kernel version
