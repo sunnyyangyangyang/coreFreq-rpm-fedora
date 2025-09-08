@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        1.beta1%{?dist}
+Release:        1.beta2%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -194,7 +194,12 @@ echo ""
 %systemd_preun corefreqd.service
 if [ $1 -eq 0 ]; then # Final uninstall only
     systemctl stop corefreqd.service >/dev/null 2>&1 || true
-    /sbin/modprobe -r corefreqk >/dev/null 2>&1 || true
+    for i in {1..5}; do
+        if /sbin/modprobe -r corefreqk >/dev/null 2>&1; then
+            break 
+        fi
+        sleep 1
+    done
 fi
 
 %postun
