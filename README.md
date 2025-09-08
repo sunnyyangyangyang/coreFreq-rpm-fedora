@@ -1,2 +1,2 @@
 # coreFreq-rpm-fedora
-coreFreq fedora rpm spec files
+coreFreq fedora rpm spec files 
