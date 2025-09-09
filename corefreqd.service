@@ -81,7 +81,7 @@ ExecStartPre=/bin/bash -c '\
         fi; \
         \
         # Wait for module to appear \
-        for wait_time in {1..60}; do \
+        for wait_time in {1..600}; do \
             if module_path=$(find_module); then \
                 echo "Module appeared at $module_path after ${wait_time}s"; \
                 /sbin/depmod -a "$(uname -r)" 2>/dev/null || true; \
