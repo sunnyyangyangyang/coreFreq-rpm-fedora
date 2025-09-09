@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        1.beta4%{?dist}
+Release:        1.beta5%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -230,7 +230,7 @@ fi
 # This will make the DNF/RPM transaction wait for the build to complete.
 echo "Compiling the CoreFreq kernel module for the current kernel..."
 echo "This may take a few minutes, please be patient."
-if ! %{_bindir}/akmods --from-akmod-posttrans --akmod %{name} --kernels "%{?kernel_versions}"; then
+if ! %{_bindir}/akmods --from-akmod-posttrans --akmod %{name} --kernels "$(uname -r)"; then
     echo "ERROR: akmods build failed! The service will not be started."
     echo "Please check the build logs in /var/cache/akmods/ for details."
     exit 1
