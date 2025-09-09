@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        1.beta3%{?dist}
+Release:        1.beta4%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -183,8 +183,13 @@ smart_mok_check
 systemctl enable corefreqd.service >/dev/null 2>&1 || true
 echo ""
 echo "CoreFreq installed successfully!"
-echo "The kernel module will be built automatically in the background."
-echo "The service will start once the module is ready."
+echo "The kernel module has been compiled."
+echo "Attempting to start the CoreFreq service..."
+
+# Since the akmod build is now synchronous, the module exists. Start the service.
+# 'try-restart' is safe and will not fail the entire installation if the service fails to start.
+systemctl try-restart corefreqd.service >/dev/null 2>&1 || :
+
 echo ""
 echo "To check status: systemctl status corefreqd.service"
 echo "Once running, use: corefreq-cli"
@@ -221,8 +226,16 @@ if [ -x /usr/bin/akmods ]; then
 fi
 
 %post -n akmod-%{name}
-# Trigger akmod build
-nohup %{_bindir}/akmods --from-akmod-posttrans --akmod %{name} --kernels "%{?kernel_versions}" &> /dev/null &
+# Synchronously build the kernel module to ensure it's ready immediately.
+# This will make the DNF/RPM transaction wait for the build to complete.
+echo "Compiling the CoreFreq kernel module for the current kernel..."
+echo "This may take a few minutes, please be patient."
+if ! %{_bindir}/akmods --from-akmod-posttrans --akmod %{name} --kernels "%{?kernel_versions}"; then
+    echo "ERROR: akmods build failed! The service will not be started."
+    echo "Please check the build logs in /var/cache/akmods/ for details."
+    exit 1
+fi
+echo "Kernel module compilation complete."
 
 %preun -n akmod-%{name}
 # Remove all versions of the module
