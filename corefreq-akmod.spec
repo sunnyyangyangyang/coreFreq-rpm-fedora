@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        1.beta6%{?dist}
+Release:        1.beta7%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -188,7 +188,7 @@ echo "Attempting to start the CoreFreq service..."
 
 # Since the akmod build is now synchronous, the module exists. Start the service.
 # 'try-restart' is safe and will not fail the entire installation if the service fails to start.
-systemctl try-restart corefreqd.service >/dev/null 2>&1 || :
+systemctl try-reload-or-restart corefreqd.service >/dev/null 2>&1 || :
 
 echo ""
 echo "To check status: systemctl status corefreqd.service"
