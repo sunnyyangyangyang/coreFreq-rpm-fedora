@@ -15,6 +15,7 @@ User=root
 Group=root
 
 # Enhanced module loading with intelligent retry logic
+ExecStartPre=-/bin/sleep 1
 ExecStartPre=/sbin/modprobe corefreqk
 
 # Main daemon execution
