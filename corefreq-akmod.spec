@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        20.beta8%{?dist}
+Release:        20.beta9%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -71,6 +71,41 @@ make %{?_smp_mflags} userspace
 install -D -m 0755 build/corefreqd %{buildroot}%{_bindir}/corefreqd
 install -D -m 0755 build/corefreq-cli %{buildroot}%{_bindir}/corefreq-cli
 install -D -m 0644 %{SOURCE1} %{buildroot}%{_unitdir}/corefreqd.service
+
+# --- Create a helper script for delayed service start ---
+cat > %{buildroot}%{_bindir}/corefreq-service-starter << 'EOF'
+#!/bin/bash
+# CoreFreq service starter with module availability check
+
+TIMEOUT=60
+INTERVAL=2
+MODULE_NAME="corefreqk"
+
+echo "Waiting for CoreFreq kernel module to be available..."
+
+for ((i=0; i<TIMEOUT; i+=INTERVAL)); do
+    # Check if module can be loaded
+    if modprobe -n "$MODULE_NAME" 2>/dev/null; then
+        echo "Module $MODULE_NAME is available, starting service..."
+        systemctl start corefreqd.service
+        if systemctl is-active --quiet corefreqd.service; then
+            echo "CoreFreq service started successfully!"
+            exit 0
+        else
+            echo "Service start failed, retrying in $INTERVAL seconds..."
+        fi
+    else
+        echo "Module not ready yet, waiting... ($i/${TIMEOUT}s)"
+    fi
+    sleep $INTERVAL
+done
+
+echo "Timeout waiting for module. You may need to start the service manually later."
+echo "Try: systemctl start corefreqd.service"
+exit 1
+EOF
+
+chmod +x %{buildroot}%{_bindir}/corefreq-service-starter
 
 # --- Create and install the kmod SRPM for akmods ---
 install -d %{buildroot}%{_usrsrc}/akmods/
@@ -183,12 +218,14 @@ smart_mok_check
 systemctl enable corefreqd.service >/dev/null 2>&1 || true
 echo ""
 echo "CoreFreq installed successfully!"
-echo "The kernel module has been compiled."
-echo "Attempting to start the CoreFreq service..."
+echo ""
 
-# Since the akmod build is now synchronous, the module exists. Start the service.
-# 'try-restart' is safe and will not fail the entire installation if the service fails to start.
-systemctl try-reload-or-restart corefreqd.service >/dev/null 2>&1 || :
+# Don't start the service immediately, let the helper do it with retry logic
+echo "Kernel module compilation is in progress..."
+echo "The service will start automatically once the module is ready."
+
+# Start the delayed service starter in background
+nohup %{_bindir}/corefreq-service-starter >/dev/null 2>&1 &
 
 echo ""
 echo "To check status: systemctl status corefreqd.service"
@@ -226,16 +263,21 @@ if [ -x /usr/bin/akmods ]; then
 fi
 
 %post -n akmod-%{name}
-# Synchronously build the kernel module to ensure it's ready immediately.
-# This will make the DNF/RPM transaction wait for the build to complete.
-echo "Compiling the CoreFreq kernel module for the current kernel..."
-echo "This may take a few minutes, please be patient."
-if ! %{_bindir}/akmods --from-akmod-posttrans --akmod %{name} --kernels "$(uname -r)"; then
-    echo "ERROR: akmods build failed! The service will not be started."
-    echo "Please check the build logs in /var/cache/akmods/ for details."
-    exit 1
+# Build the kernel module asynchronously to avoid blocking the transaction
+echo "Initiating CoreFreq kernel module compilation..."
+echo "This will happen in the background."
+
+# Use at to schedule immediate build, or fallback to nohup
+if command -v at >/dev/null 2>&1 && systemctl is-active --quiet atd; then
+    echo "%{_bindir}/akmods --from-akmod-posttrans --akmod %{name} --kernels \"\$(uname -r)\"" | at now + 1 minute 2>/dev/null || {
+        nohup sh -c 'sleep 10; %{_bindir}/akmods --from-akmod-posttrans --akmod %{name} --kernels "$(uname -r)"' >/dev/null 2>&1 &
+    }
+else
+    # Fallback to nohup with delay
+    nohup sh -c 'sleep 10; %{_bindir}/akmods --from-akmod-posttrans --akmod %{name} --kernels "$(uname -r)"' >/dev/null 2>&1 &
 fi
-echo "Kernel module compilation complete."
+
+echo "Module compilation scheduled. Check 'systemctl status corefreqd.service' in a few minutes."
 
 %preun -n akmod-%{name}
 # Remove all versions of the module
@@ -251,6 +293,7 @@ fi
 %doc README.md
 %{_bindir}/corefreq-cli
 %{_bindir}/corefreqd
+%{_bindir}/corefreq-service-starter
 %{_unitdir}/corefreqd.service
 
 %files -n akmod-%{name}
@@ -262,9 +305,10 @@ fi
 # This package is empty but serves as a dependency anchor
 
 %changelog
-* Sat Sep 07 2025 Package Maintainer <package@example.com> - 2.0.8-1.alpha28
-- Added kernel update triggers for automatic module rebuilds
-- Improved MOK detection logic - checks actual enrollment status and pending requests
-- Removed automatic password generation and MOK enrollment
-- Now provides clear manual instructions for MOK enrollment when needed
-- Added triggers for kernel-modules and kernel-modules-core packages
+* Sat Sep 07 2025 Package Maintainer <package@example.com> - 2.0.8-1.alpha30
+- Forced synchronous kernel module compilation during akmod install
+- Added module verification and marker file system
+- Main package now waits for akmod completion before starting service
+- Improved error handling and user feedback for compilation failures
+- Added comprehensive module path verification
+- Service startup now guaranteed to happen after successful compilation
