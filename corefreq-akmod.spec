@@ -234,11 +234,33 @@ echo ""
 
 %preun
 %systemd_preun corefreqd.service
-if [ $1 -eq 0 ]; then # Final uninstall only
+# This scriptlet runs on final removal ($1 == 0), not on upgrade.
+if [ $1 -eq 0 ]; then
+    echo "Stopping CoreFreq service for final removal..."
+    # Stop the service. Redirect output as it can be noisy.
     systemctl stop corefreqd.service >/dev/null 2>&1 || true
+
+    # Wait up to 5 seconds for the service to fully stop.
     for i in {1..5}; do
-        if /sbin/modprobe -r corefreqk >/dev/null 2>&1; then
-            break 
+        if ! systemctl is-active --quiet corefreqd.service; then
+            echo "Service confirmed stopped."
+            break
+        fi
+        sleep 1
+    done
+
+    # Now, attempt to unload the kernel module with a retry loop.
+    echo "Unloading CoreFreq kernel module..."
+    for i in {1..5}; do
+        # Check if the module is loaded before trying to remove it.
+        if lsmod | grep -q "^corefreqk\s"; then
+            if /sbin/modprobe -r corefreqk >/dev/null 2>&1; then
+                echo "Module corefreqk successfully unloaded."
+                break # Success, exit the loop
+            fi
+        else
+            echo "Module corefreqk is not loaded."
+            break # Not loaded, nothing to do
         fi
         sleep 1
     done
