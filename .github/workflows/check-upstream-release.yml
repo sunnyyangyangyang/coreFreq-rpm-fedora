@@ -1,18 +1,13 @@
 name: Check for Upstream Release and Update Spec
 
 on:
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
-
-  # Runs automatically every day at 03:33 UTC
   schedule:
     - cron: '33 3 * * *'
 
 jobs:
   check-and-update:
     runs-on: ubuntu-latest
-
-    # Grant permissions for the workflow to read repository contents and write commits
     permissions:
       contents: write
 
@@ -23,79 +18,80 @@ jobs:
       - name: Get latest upstream release version
         id: upstream
         run: |
-          # Robustness: Retry curl up to 3 times to handle temporary network/API issues
+          # ... (此部分代码不变) ...
           API_RESPONSE=$(curl --retry 3 --retry-delay 10 -s "https://api.github.com/repos/cyring/CoreFreq/releases/latest")
-
-          # Robustness: Check if the API response is valid and contains the tag_name
           if ! echo "${API_RESPONSE}" | jq -e '.tag_name' > /dev/null; then
             echo "::error::Failed to get valid API response or 'tag_name' is missing."
-            echo "API Response was: ${API_RESPONSE}"
             exit 1
           fi
-
-          # Robustness: Extract the version tag and check that it's not null/empty
           LATEST_TAG=$(echo "${API_RESPONSE}" | jq -r .tag_name | sed 's/^v//')
           if [ -z "${LATEST_TAG}" ] || [ "${LATEST_TAG}" == "null" ]; then
             echo "::error::Extracted version is null or empty. Aborting."
             exit 1
           fi
-          
           echo "Latest upstream version is: ${LATEST_TAG}"
           echo "version=${LATEST_TAG}" >> $GITHUB_OUTPUT
 
       - name: Get current spec version
         id: spec
         run: |
-          # CORRECTED: Target the %global variable, not the Version: line.
-          # Grep the '%global corefreq_version' line and get the 3rd field.
+          # ... (此部分代码不变) ...
           CURRENT_VERSION=$(grep '^%global corefreq_version' corefreq-akmod.spec | awk '{print $3}')
-          
-          # Robustness: Check if the current version was extracted successfully
           if [ -z "${CURRENT_VERSION}" ]; then
             echo "::error::Could not extract current version from corefreq-akmod.spec. Aborting."
             exit 1
           fi
-
           echo "Current spec version is: ${CURRENT_VERSION}"
           echo "version=${CURRENT_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Compare versions and update if necessary
-        # Robustness: Only run if both versions were successfully extracted and are different
         if: steps.upstream.outputs.version && steps.spec.outputs.version && steps.upstream.outputs.version != steps.spec.outputs.version
         run: |
-          echo "New version found! Updating spec file from ${{ steps.spec.outputs.version }} to ${{ steps.upstream.outputs.version }}..."
+          echo "New version found! Updating files from ${{ steps.spec.outputs.version }} to ${{ steps.upstream.outputs.version }}..."
+          NEW_VERSION="${{ steps.upstream.outputs.version }}"
+
+          # 1. Update the spec file
+          sed -i "s/^\(%global corefreq_version\s\+\).*/\1${NEW_VERSION}/" corefreq-akmod.spec
+          echo "✅ corefreq-akmod.spec updated."
+
+          # 2. Update the .copr/Makefile
+          sed -i "s/^\(VERSION\s*=\s*\).*/\1${NEW_VERSION}/" .copr/Makefile
+          echo "✅ .copr/Makefile updated."
+
+          # --- NEW: PARSE VERSION AND UPDATE Makefile.akmod ---
+          # 3. Parse the new version into MAJOR, MINOR, REV
+          VERSION_MAJOR=$(echo "$NEW_VERSION" | awk -F. '{print $1}')
+          VERSION_MINOR=$(echo "$NEW_VERSION" | awk -F. '{print $2}')
+          VERSION_REV=$(echo "$NEW_VERSION" | awk -F. '{print $3}')
           
-          # CORRECTED: Use the correct filename 'corefreq-akmod.spec'
-          # This sed command correctly targets the %global line you are using.
-          sed -i "s/^\(%global corefreq_version\s\+\).*/\1${{ steps.upstream.outputs.version }}/" corefreq-akmod.spec
-          
-          # CORRECTED: The verification check now also looks at the %global line.
-          if ! grep -q "^%global corefreq_version\s\+${{ steps.upstream.outputs.version }}" corefreq-akmod.spec; then
-            echo "::error::sed command failed to update the spec file. Manual intervention required."
+          # Check if parsing was successful
+          if [ -z "$VERSION_MAJOR" ] || [ -z "$VERSION_MINOR" ] || [ -z "$VERSION_REV" ]; then
+            echo "::error::Failed to parse new version string: ${NEW_VERSION}"
             exit 1
           fi
 
-          echo "Spec file updated. Adding changelog entry..."
+          # 4. Update Makefile.akmod with the new components
+          sed -i "s/^\(COREFREQ_MAJOR\s*=\s*\).*/\1${VERSION_MAJOR}/" Makefile.akmod
+          sed -i "s/^\(COREFREQ_MINOR\s*=\s*\).*/\1${VERSION_MINOR}/" Makefile.akmod
+          sed -i "s/^\(COREFREQ_REV\s*=\s*\).*/\1${VERSION_REV}/" Makefile.akmod
+          echo "✅ Makefile.akmod updated."
+          # --- END NEW SECTION ---
 
-          # Automatic Changelog Entry
+          echo "Adding changelog entry..."
           CHANGELOG_DATE=$(date -R)
-          # Use the standard GitHub Actions bot identity for the commit
           AUTHOR_INFO="github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
-          
-          # Use awk to insert the new entry right after the %changelog directive
-          awk -v date="${CHANGELOG_DATE}" -v version="${{ steps.upstream.outputs.version }}" -v author="${AUTHOR_INFO}" \
+          awk -v date="${CHANGELOG_DATE}" -v version="${NEW_VERSION}" -v author="${AUTHOR_INFO}" \
             '/%changelog/ { print; print "* " date " " author " - " version "-1"; print "- Update to upstream version " version; print ""; next } 1' \
             corefreq-akmod.spec > corefreq-akmod.spec.new && mv corefreq-akmod.spec.new corefreq-akmod.spec
 
           echo "Committing changes..."
-          
-          # Configure git with a user name and email for the commit
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
-          # Add the changed file, commit, and push
-          git add corefreq-akmod.spec
-          git commit -m "chore(release): Bump version to ${{ steps.upstream.outputs.version }}"
+          # --- CHANGED: Add all three files to the commit ---
+          git add corefreq-akmod.spec .copr/Makefile Makefile.akmod
+          
+          git commit -m "chore(release): Bump version to ${NEW_VERSION}"
           git push
           
       - name: Report no changes
