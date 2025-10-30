@@ -2,12 +2,12 @@
 %global _debugsource_packages 0
 %global _debuginfo_packages 0
 %global debug_package %{nil}
-
+%global _dracut_conf_d       /usr/lib/dracut/dracut.conf.d
 %global corefreq_version 2.0.8
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        24.alpha21%{?dist}
+Release:        24.alpha22%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -145,6 +145,14 @@ ln -s "$SRPM_NAME" %{buildroot}%{_usrsrc}/akmods/%{name}-kmod.latest
 # 7. Clean up the temporary directory
 rm -rf "$SRPM_TOPDIR"
 
+# --- Dracut configuration to prevent module inclusion in initramfs ---
+install -d -m 0755 %{buildroot}%{_dracut_conf_d}
+cat > %{buildroot}%{_dracut_conf_d}/99-corefreq.conf << EOF
+# Do not include the corefreqk module in the initramfs.
+# It is not needed for boot and can cause hangs during system-upgrade.
+omit_drivers+=" corefreqk "
+EOF
+
 %post
 # === SMART MOK DETECTION AND SETUP ===
 smart_mok_check() {
@@ -234,10 +242,25 @@ echo "To check status: systemctl status corefreqd.service"
 echo "Once running, use: corefreq-cli"
 echo ""
 
+# When a new kernel is installed, its initramfs is created.
+# We need to ensure that our dracut config is in place *before* that happens.
+# However, if the user installs the kernel and corefreq in the same transaction,
+# our config might not be seen. Re-running dracut on our package install ensures
+# the currently running kernel's initramfs is correct.
+# This scriptlet runs after this package has been installed.
+%posttrans
+# Best-effort attempt to rebuild initramfs for the running kernel.
+# The --force is important to ensure it rebuilds even if it thinks it doesn't need to.
+/usr/bin/dracut --force --kver "$(uname -r)" >/dev/null 2>&1 || :
+
 %preun
 %systemd_preun corefreqd.service
 # This scriptlet runs on final removal ($1 == 0), not on upgrade.
 if [ $1 -eq 0 ]; then
+    # On final removal, rebuild the initramfs for the running kernel to remove
+    # any potential lingering configurations related to corefreq.
+    echo "Rebuilding initramfs for the current kernel to finalize removal..."
+    /usr/bin/dracut --force --kver "$(uname -r)" >/dev/null 2>&1 || :
     echo "Stopping CoreFreq service for final removal..."
     # Stop the service. Redirect output as it can be noisy.
     systemctl stop corefreqd.service >/dev/null 2>&1 || true
@@ -289,6 +312,7 @@ echo "This will happen in the background and may take a few minutes."
 %{_bindir}/corefreqd
 %{_bindir}/corefreq-service-starter
 %{_unitdir}/corefreqd.service
+%{_dracut_conf_d}/99-corefreq.conf
 
 %files -n akmod-%{name}
 # Package the SRPM and the symlink
