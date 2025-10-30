@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        24.alpha23%{?dist}
+Release:        24.alpha24%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -295,15 +295,17 @@ fi
 %systemd_postun_with_restart corefreqd.service
 
 %post -n akmod-%{name}
-# This scriptlet runs when the akmod-corefreq package is installed.
-# We kick off a build for the currently running kernel in the background.
-# This provides a better user experience, so the module is available
-# without needing a reboot.
 echo "Initiating CoreFreq kernel module compilation for the current kernel."
 echo "This will happen in the background and may take a few minutes."
+
+# 同步编译并在成功后启动服务
 (
-  nohup /usr/sbin/akmods --akmod %{name} --kernels "$(uname -r)" &
-) >/dev/null 2>&1
+  /usr/sbin/akmods --akmod %{name} --kernels "$(uname -r)"
+  if [ $? -eq 0 ]; then
+    echo "Module compiled successfully, starting service..."
+    systemctl start corefreqd.service 2>/dev/null || true
+  fi
+) >/dev/null 2>&1 &
 
 %files
 %license LICENSE
