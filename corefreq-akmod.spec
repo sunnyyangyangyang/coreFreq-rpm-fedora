@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        21%{?dist}
+Release:        24.alpha20%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -269,46 +269,16 @@ fi
 %postun
 %systemd_postun_with_restart corefreqd.service
 
-# === KERNEL UPDATE TRIGGERS FOR AUTOMATIC REBUILDS ===
-%triggerin -- kernel kernel-core kernel-devel kernel-modules kernel-modules-core
-echo "Kernel update detected, rebuilding CoreFreq module..."
-if [ -x /usr/bin/akmods ]; then
-    # Run in background to avoid blocking the transaction
-    nohup sh -c 'sleep 5; /usr/bin/akmods --akmod %{name} --force' >/dev/null 2>&1 &
-fi
-
-%triggerpostun -- kernel kernel-core kernel-devel kernel-modules kernel-modules-core
-echo "Kernel removal detected, cleaning up CoreFreq modules..."
-if [ -x /usr/bin/akmods ]; then
-    # Clean up modules for removed kernels
-    /usr/bin/akmods --remove %{name} >/dev/null 2>&1 || true
-fi
-
 %post -n akmod-%{name}
-# Build the kernel module asynchronously to avoid blocking the transaction
-echo "Initiating CoreFreq kernel module compilation..."
-echo "This will happen in the background."
-
-# Use at to schedule immediate build, or fallback to nohup
-if command -v at >/dev/null 2>&1 && systemctl is-active --quiet atd; then
-    echo "%{_bindir}/akmods --from-akmod-posttrans --akmod %{name} --kernels \"\$(uname -r)\"" | at now + 1 minute 2>/dev/null || {
-        nohup sh -c 'sleep 10; %{_bindir}/akmods --from-akmod-posttrans --akmod %{name} --kernels "$(uname -r)"' >/dev/null 2>&1 &
-    }
-else
-    # Fallback to nohup with delay
-    nohup sh -c 'sleep 10; %{_bindir}/akmods --from-akmod-posttrans --akmod %{name} --kernels "$(uname -r)"' >/dev/null 2>&1 &
-fi
-
-echo "Module compilation scheduled. Check 'systemctl status corefreqd.service' in a few minutes."
-
-%preun -n akmod-%{name}
-# Remove all versions of the module
-if [ $1 -eq 0 ]; then # Final uninstall only
-    for kver in $(find /lib/modules -name "corefreqk.ko" -exec dirname {} \; 2>/dev/null | sed 's|.*/modules/||;s|/.*||' | sort -u); do
-        rm -rf "/lib/modules/$kver/extra/corefreq" "/lib/modules/$kver/updates/corefreqk.ko" 2>/dev/null || true
-        /sbin/depmod -a "$kver" 2>/dev/null || true
-    done
-fi
+# This scriptlet runs when the akmod-corefreq package is installed.
+# We kick off a build for the currently running kernel in the background.
+# This provides a better user experience, so the module is available
+# without needing a reboot.
+echo "Initiating CoreFreq kernel module compilation for the current kernel."
+echo "This will happen in the background and may take a few minutes."
+(
+  nohup /usr/sbin/akmods --akmod %{name} --kernels "$(uname -r)" &
+) >/dev/null 2>&1
 
 %files
 %license LICENSE
