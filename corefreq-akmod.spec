@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        24.alpha20%{?dist}
+Release:        24.alpha21%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -28,6 +28,8 @@ BuildRequires:  kernel-devel
 Requires:       systemd
 Suggests:       mokutil
 Requires:       %{name}-kmod >= %{version}
+Requires:       %{name}-kmod-common >= %{?epoch:%{epoch}:}%{version}
+
 
 # Generate akmod metadata
 %{expand:%(kmodtool --target %{_target_cpu} --kmodname %{name} --pattern ".*" --akmod 2>/dev/null) }
