@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        25%{?dist}
+Release:        26%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -295,6 +295,77 @@ fi
 %systemd_postun_with_restart corefreqd.service
 
 %post -n akmod-%{name}
+
+# === SMART MOK DETECTION AND SETUP ===
+smart_mok_check() {
+    local akmods_key="/etc/pki/akmods/certs/public_key.der"
+    local pending_keys="/var/lib/mokutil/request"
+    local secure_boot_enabled=false
+    
+    # Check if Secure Boot is enabled
+    if [ -d /sys/firmware/efi/efivars ]; then
+        if mokutil --sb-state 2>/dev/null | grep -q "SecureBoot enabled"; then
+            secure_boot_enabled=true
+        fi
+    fi
+    
+    # Only proceed if Secure Boot is enabled
+    if [ "$secure_boot_enabled" = "false" ]; then
+        return 0
+    fi
+    
+    # Check if akmods key exists
+    if [ ! -f "$akmods_key" ]; then
+        echo "Warning: akmods signing key not found. Module signing may fail."
+        return 1
+    fi
+    
+    # Check if key is already enrolled (multiple ways to detect this)
+    if mokutil --list-enrolled 2>/dev/null | grep -q "CN=akmods" || \
+       mokutil --test-key "$akmods_key" 2>&1 | grep -q "already enrolled\|SKIP.*already enrolled"; then
+        echo "akmods MOK key already enrolled."
+        return 0
+    fi
+    
+    # Check if there are pending MOK requests
+    if [ -d "$pending_keys" ] && [ -n "$(ls -A "$pending_keys" 2>/dev/null)" ]; then
+        cat << 'EOF'
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔐 MOK KEY ENROLLMENT PENDING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+You have pending MOK (Machine Owner Key) enrollments.
+
+To complete enrollment:
+1. REBOOT your computer
+2. At the blue 'MOK Manager' screen during boot:
+   → Select 'Enroll MOK'
+   → Enter the password you provided
+   → Confirm enrollment
+
+If you need to enroll the akmods key manually:
+  sudo mokutil --import /etc/pki/akmods/certs/public_key.der
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EOF
+        return 0
+    fi
+    
+    # If no pending requests and key not enrolled, show manual enrollment
+    cat << 'EOF'
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔐 SECURE BOOT DETECTED - MOK ENROLLMENT REQUIRED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+To use CoreFreq with Secure Boot, enroll the akmods signing key:
+
+  sudo mokutil --import /etc/pki/akmods/certs/public_key.der
+
+Then REBOOT and follow the on-screen MOK Manager instructions.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EOF
+}
+
+# Run smart MOK check
+smart_mok_check
+
 echo "Initiating CoreFreq kernel module compilation for the current kernel."
 echo "This will happen in the background and may take a few minutes."
 
