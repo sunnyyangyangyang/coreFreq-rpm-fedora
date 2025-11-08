@@ -47,11 +47,20 @@ for kernel_version in %{?kernel_versions} ; do
 done
 
 %build
+# Determine CPU vendor to apply architecture-specific PMC flags
+CPU_VENDOR=$(grep -m 1 '^vendor_id' /proc/cpuinfo | awk '{print $3}')
+MAKE_VARS=""
+if [ "$CPU_VENDOR" = "AuthenticAMD" ]; then
+    echo "Detected AMD CPU. Enabling UMC performance counters."
+    MAKE_VARS="ARCH_PMC=UMC"
+fi
+
 for kernel_version in %{?kernel_versions}; do
     pushd _kmod_build_${kernel_version%%___*}/
     %make_build \
         KVER="${kernel_version%%___*}" \
         KDIR="${kernel_version##*___}" \
+        ${MAKE_VARS} \
         modules
     popd
 done
