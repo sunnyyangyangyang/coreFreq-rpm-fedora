@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        25.alpha2%{?dist}
+Release:        25.alpha3%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -27,8 +27,8 @@ BuildRequires:  kernel-devel
 # Runtime Requirements
 Requires:       systemd
 Suggests:       mokutil
-Requires:       %{name}-kmod >= %{version}
-Requires:       %{name}-kmod-common >= %{?epoch:%{epoch}:}%{version}
+Requires:       %{name}-kmod = %{?epoch:%{epoch}:}%{version}-%{release}
+Requires:       %{name}-kmod-common = %{?epoch:%{epoch}:}%{version}-%{release}
 
 
 # Generate akmod metadata
@@ -44,7 +44,7 @@ Summary:        Akmod package for %{name} kernel module(s)
 Requires:       kmodtool
 Requires:       akmods
 Provides:       %{name}-kmod = %{?epoch:%{epoch}:}%{version}-%{release}
-Requires:       %{name}-kmod-common >= %{?epoch:%{epoch}:}%{version}
+Requires:       %{name}-kmod-common = %{?epoch:%{epoch}:}%{version}-%{release}
 
 %description -n akmod-%{name}
 This package provides the akmod package for the %{name} kernel modules.
@@ -52,7 +52,7 @@ This package provides the akmod package for the %{name} kernel modules.
 %package kmod-common
 Summary:        Common files for %{name} kernel module
 Requires:       %{name} = %{?epoch:%{epoch}:}%{version}-%{release}
-Provides:       %{name}-kmod-common = %{?epoch:%{epoch}:}%{version}
+Provides:       %{name}-kmod-common = %{?epoch:%{epoch}:}%{version}-%{release}
 
 %description kmod-common
 This package provides the common files for the %{name} kernel modules.
