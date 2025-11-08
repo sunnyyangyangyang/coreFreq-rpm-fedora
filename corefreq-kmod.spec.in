@@ -49,14 +49,25 @@ done
 %build
 # Determine CPU vendor to apply architecture-specific PMC flags
 CPU_VENDOR=$(grep -m 1 '^vendor_id' /proc/cpuinfo | awk '{print $3}')
+
+# Prepare a variable for the make command based on the CPU vendor
 MAKE_VARS=""
 if [ "$CPU_VENDOR" = "AuthenticAMD" ]; then
+    # For AMD Zen, UMC provides the most comprehensive performance data
     echo "Detected AMD CPU. Enabling UMC performance counters."
     MAKE_VARS="ARCH_PMC=UMC"
+elif [ "$CPU_VENDOR" = "GenuineIntel" ]; then
+    # For modern Intel CPUs, PCU unlocks Uncore/Slice counters and other metrics
+    echo "Detected Intel CPU. Enabling PCU performance counters."
+    MAKE_VARS="ARCH_PMC=PCU"
+else
+    # For other or unknown vendors, build without special PMC flags
+    echo "CPU vendor not AMD or Intel. Building without specific PMC flags."
 fi
 
 for kernel_version in %{?kernel_versions}; do
     pushd _kmod_build_${kernel_version%%___*}/
+    # Pass the determined MAKE_VARS (which could be empty) to the build command
     %make_build \
         KVER="${kernel_version%%___*}" \
         KDIR="${kernel_version##*___}" \
