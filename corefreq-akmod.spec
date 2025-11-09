@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        25.beta3%{?dist}
+Release:        27%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -80,7 +80,7 @@ SRPM_TOPDIR=$(mktemp -d)
 mkdir -p "$SRPM_TOPDIR"/{SOURCES,SPECS}
 
 sed -e 's|@COREFREQ_VERSION@|%{corefreq_version}|g' \
-    -e 's|@RELEASE@|%{release}%{?dist}|g' \
+    -e 's|@RELEASE@|%{release}|g' \
     %{SOURCE3} > "$SRPM_TOPDIR"/SPECS/corefreq-kmod.spec
 
 tar -czf "$SRPM_TOPDIR"/SOURCES/corefreq-kmod-%{version}.tar.gz \
