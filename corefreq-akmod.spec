@@ -80,7 +80,7 @@ SRPM_TOPDIR=$(mktemp -d)
 mkdir -p "$SRPM_TOPDIR"/{SOURCES,SPECS}
 
 sed -e 's|@COREFREQ_VERSION@|%{corefreq_version}|g' \
-    -e 's|@RELEASE@|1%{?dist}|g' \
+    -e 's|@RELEASE@|%{release}%{?dist}|g' \
     %{SOURCE3} > "$SRPM_TOPDIR"/SPECS/corefreq-kmod.spec
 
 tar -czf "$SRPM_TOPDIR"/SOURCES/corefreq-kmod-%{version}.tar.gz \
