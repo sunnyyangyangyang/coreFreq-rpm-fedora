@@ -9,7 +9,7 @@
 
 Name:          corefreq-kmod
 Version:       @COREFREQ_VERSION@
-Release:       @RELEASE@%{?dist}
+Release:       @RELEASE@
 Summary:       CoreFreq kernel module
 
 License:       GPL-2.0-only
