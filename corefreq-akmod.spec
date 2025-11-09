@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        25.beta1%{?dist}
+Release:        25.beta2%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -205,13 +205,15 @@ fi
 %systemd_postun_with_restart corefreqd.service
 
 %post -n akmod-%{name}
-# Trigger akmods to build for current kernel
-# This happens asynchronously via systemd
-akmods --force --akmod %{name} --kernels "$(uname -r)" >/dev/null 2>&1 &
+# The akmods.service will automatically build the module on next boot.
+# We just ensure the SRPM is in place and trigger a rebuild marker.
+
+# Create a marker to ensure akmods processes this on next boot
+touch /var/cache/akmods/%{name}-kmod-needs-build 2>/dev/null || true
 
 echo ""
-echo "Kernel module compilation scheduled."
-echo "It will complete automatically during boot."
+echo "Kernel module will be compiled automatically on next boot."
+echo "The akmods.service handles this during system startup."
 echo ""
 
 %files

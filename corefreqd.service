@@ -1,22 +1,24 @@
 [Unit]
 Description=CoreFreq CPU Monitoring Daemon
 Documentation=https://github.com/cyring/CoreFreq
-After=systemd-modules-load.service akmods.service
-Wants=akmods.service
-ConditionPathExists=/sys/module/corefreqk
+After=systemd-modules-load.service
+# Only start after basic system is ready
+After=basic.target sysinit.target
+Before=multi-user.target
 
 [Service]
 Type=simple
 User=root
 Group=root
 
-# Load module (should already be available after boot)
+# Load the kernel module - this will fail if module doesn't exist
+# which is the correct behavior (service won't start)
 ExecStartPre=/sbin/modprobe corefreqk
 
 # Main daemon
 ExecStart=/usr/bin/corefreqd -q
 
-# Cleanup on stop
+# Unload module on stop
 ExecStopPost=-/sbin/modprobe -r corefreqk
 
 # Service behavior
