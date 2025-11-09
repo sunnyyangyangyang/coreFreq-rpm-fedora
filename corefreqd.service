@@ -3,45 +3,35 @@ Description=CoreFreq CPU Monitoring Daemon
 Documentation=https://github.com/cyring/CoreFreq
 After=systemd-modules-load.service akmods.service
 Wants=akmods.service
-# Ensure we start after basic system initialization
-After=basic.target sysinit.target
-Before=multi-user.target
-StartLimitBurst=3
-StartLimitIntervalSec=300
+ConditionPathExists=/sys/module/corefreqk
 
 [Service]
 Type=simple
 User=root
 Group=root
 
-# Enhanced module loading with intelligent retry logic
+# Load module (should already be available after boot)
 ExecStartPre=/sbin/modprobe corefreqk
 
-# Main daemon execution
+# Main daemon
 ExecStart=/usr/bin/corefreqd -q
 
 # Cleanup on stop
-ExecStopPost=-/bin/bash -c '\
-    echo "Stopping CoreFreq daemon"; \
-    /sbin/modprobe -r corefreqk >/dev/null 2>&1 || true'
+ExecStopPost=-/sbin/modprobe -r corefreqk
 
 # Service behavior
 Restart=on-failure
 RestartSec=10
 
-# Extended timeouts for akmod builds and Secure Boot scenarios
-TimeoutStartSec=180
-TimeoutStopSec=30
+# Timeouts
+TimeoutStartSec=30
+TimeoutStopSec=15
 
-# Security and resource settings
+# Security settings
 NoNewPrivileges=false
 PrivateDevices=false
 ProtectSystem=false
 ProtectHome=false
-
-# Environment
-Environment=HOME=/root
-Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 [Install]
 WantedBy=multi-user.target
