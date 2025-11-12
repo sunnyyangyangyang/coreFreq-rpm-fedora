@@ -1,7 +1,7 @@
 # COPR Makefile for CoreFreq akmod - Fixed Version
 # This file should be placed at .copr/Makefile in your COPR repository
 
-VERSION = 2.0.8
+VERSION = 2.0.9
 RELEASE = 1
 SPEC_FILE = corefreq-akmod.spec
 

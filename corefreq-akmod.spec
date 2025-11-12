@@ -3,7 +3,7 @@
 %global _debuginfo_packages 0
 %global debug_package %{nil}
 %global _dracut_conf_d /usr/lib/dracut/dracut.conf.d
-%global corefreq_version 2.0.8
+%global corefreq_version 2.0.9
 
 Name:           corefreq
 Version:        %{corefreq_version}
@@ -232,6 +232,9 @@ echo ""
 # Empty dependency anchor package
 
 %changelog
+* Wed, 12 Nov 2025 03:56:57 +0000 github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com> - 2.0.9-1
+- Update to upstream version 2.0.9
+
 * Sun Nov 09 2025 Package Maintainer <package@example.com> - 2.0.8-26
 - Adopt NVIDIA-style approach: reboot required after installation
 - Remove all attempts to start service immediately after install
