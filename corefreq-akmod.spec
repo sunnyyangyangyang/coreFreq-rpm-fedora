@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        27%{?dist}
+Release:        28%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -176,15 +176,10 @@ To check service status:
 
 EOF
 
-%posttrans
-# Rebuild initramfs for running kernel
-/usr/bin/dracut --force --kver "$(uname -r)" >/dev/null 2>&1 || :
-
 %preun
 %systemd_preun corefreqd.service
 if [ $1 -eq 0 ]; then
     echo "Removing CoreFreq..."
-    /usr/bin/dracut --force --kver "$(uname -r)" >/dev/null 2>&1 || :
     systemctl stop corefreqd.service >/dev/null 2>&1 || true
     
     # Wait for service to stop
