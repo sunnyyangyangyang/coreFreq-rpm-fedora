@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        27.beta2%{?dist}
+Release:        27.beta3%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -107,43 +107,76 @@ omit_drivers+=" corefreqk "
 EOF
 
 %post
+# Generate akmods signing key if it doesn't exist
+# This uses the official kmodgenca tool from akmods package
+if [ ! -f /etc/pki/akmods/certs/public_key.der ]; then
+    echo "Generating akmods signing keys..."
+    /usr/sbin/kmodgenca -a 2>/dev/null || true
+fi
+
 # === SMART MOK DETECTION ===
 smart_mok_check() {
     local akmods_key="/etc/pki/akmods/certs/public_key.der"
-    local secure_boot_enabled=false
     
-    # Check if Secure Boot is enabled
-    if [ -d /sys/firmware/efi/efivars ]; then
-        if mokutil --sb-state 2>/dev/null | grep -q "SecureBoot enabled"; then
-            secure_boot_enabled=true
-        fi
-    fi
-    
-    if [ "$secure_boot_enabled" = "false" ]; then
+    # Early exit: Not a UEFI system
+    if [ ! -d /sys/firmware/efi/efivars ]; then
         return 0
     fi
     
+    # Early exit: mokutil not available
+    if ! command -v mokutil >/dev/null 2>&1; then
+        return 0
+    fi
+    
+    # Check if Secure Boot is enabled
+    local sb_state
+    sb_state=$(mokutil --sb-state 2>/dev/null)
+    
+    if ! echo "$sb_state" | grep -q "SecureBoot enabled"; then
+        return 0
+    fi
+    
+    # At this point: UEFI + Secure Boot enabled
+    
+    # Key should exist now (we just generated it)
     if [ ! -f "$akmods_key" ]; then
+        cat << 'EOF'
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️  SECURE BOOT WARNING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Failed to generate akmods key. After reboot, run:
+  sudo mokutil --import /etc/pki/akmods/certs/public_key.der
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+EOF
         return 1
     fi
     
     # Check if key is already enrolled
     if mokutil --list-enrolled 2>/dev/null | grep -q "CN=akmods" || \
-       mokutil --test-key "$akmods_key" 2>&1 | grep -q "already enrolled\|SKIP.*already enrolled"; then
+       mokutil --test-key "$akmods_key" 2>&1 | grep -qi "already.*enrolled"; then
         return 0
     fi
     
-    # Show enrollment instructions
+    # Key exists but NOT enrolled - show instructions
     cat << 'EOF'
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔐 SECURE BOOT DETECTED - ACTION REQUIRED
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-To use CoreFreq with Secure Boot, enroll the MOK key:
+To use CoreFreq with Secure Boot, enroll the MOK key NOW (before reboot):
 
   sudo mokutil --import /etc/pki/akmods/certs/public_key.der
 
-Then reboot and follow the MOK Manager prompts.
+You'll be asked to create a password. Remember it for the next reboot.
+
+After rebooting:
+  1. MOK Manager will appear
+  2. Select "Enroll MOK"
+  3. Enter the password you just created
+  4. Reboot again
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 EOF
@@ -151,10 +184,8 @@ EOF
 
 smart_mok_check
 
-# Register service with systemd (handles daemon-reload and preset)
+# Register service with systemd
 %systemd_post corefreqd.service
-
-# Ensure service is enabled (redundant but explicit - preset may vary)
 systemctl enable corefreqd.service >/dev/null 2>&1 || true
 
 cat << 'EOF'
