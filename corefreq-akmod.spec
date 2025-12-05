@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        27.beta4%{?dist}
+Release:        27.beta5%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -220,13 +220,10 @@ if [ $1 -eq 0 ]; then
 fi
 
 %postun
-if [ $1 -eq 0 ]; then
-    # Complete uninstall: clean up systemd state
-    %systemd_postun corefreqd.service
-else
-    # Upgrade scenario: reload systemd but don't restart service
-    %systemd_postun corefreqd.service
-    
+%systemd_postun corefreqd.service
+
+if [ $1 -ne 0 ]; then
+    # Upgrade scenario: show message
     cat << 'EOF'
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
