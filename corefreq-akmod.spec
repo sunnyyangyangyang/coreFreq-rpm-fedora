@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        28%{?dist}
+Release:        27.beta1%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -151,8 +151,10 @@ EOF
 
 smart_mok_check
 
-# Enable service (will start on next boot)
+# Register service with systemd (handles daemon-reload and preset)
 %systemd_post corefreqd.service
+
+# Ensure service is enabled (redundant but explicit - preset may vary)
 systemctl enable corefreqd.service >/dev/null 2>&1 || true
 
 cat << 'EOF'
@@ -177,27 +179,38 @@ To check service status:
 EOF
 
 %preun
+# Stop service before uninstall/upgrade
 %systemd_preun corefreqd.service
+
 if [ $1 -eq 0 ]; then
-    echo "Removing CoreFreq..."
-    systemctl stop corefreqd.service >/dev/null 2>&1 || true
-    
-    # Wait for service to stop
-    for i in {1..5}; do
-        if ! systemctl is-active --quiet corefreqd.service; then
-            break
-        fi
-        sleep 1
-    done
-    
-    # Unload module
-    if lsmod | grep -q "^corefreqk\s"; then
-        /sbin/modprobe -r corefreqk >/dev/null 2>&1 || true
-    fi
+    # Complete uninstall: try to remove the kernel module
+    # (May fail if in use - that's OK, reboot will clear it)
+    /sbin/modprobe -r corefreqk >/dev/null 2>&1 || true
 fi
 
 %postun
-%systemd_postun_with_restart corefreqd.service
+if [ $1 -eq 0 ]; then
+    # Complete uninstall: clean up systemd state
+    %systemd_postun corefreqd.service
+else
+    # Upgrade scenario: reload systemd but don't restart service
+    %systemd_postun corefreqd.service
+    
+    cat << 'EOF'
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ CoreFreq Upgraded
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️  REBOOT REQUIRED
+
+The kernel module needs to be recompiled for the new version.
+Please reboot your system to complete the upgrade.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+EOF
+fi
 
 %post -n akmod-%{name}
 # The akmods.service will automatically build the module on next boot.
@@ -227,7 +240,12 @@ echo ""
 # Empty dependency anchor package
 
 %changelog
-* Wed, 12 Nov 2025 03:56:57 +0000 github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com> - 2.0.9-1
+* Fri Dec 06 2025 Package Maintainer <package@example.com> - 2.0.9-29
+- Clean up %preun: remove redundant systemctl stop and sleep loop
+- Trust systemd's synchronous stop behavior
+- Maintain consistent upgrade behavior without service restart
+
+* Wed Nov 12 2025 github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com> - 2.0.9-1
 - Update to upstream version 2.0.9
 
 * Sun Nov 09 2025 Package Maintainer <package@example.com> - 2.0.8-26
