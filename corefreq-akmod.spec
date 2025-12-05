@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        27.beta1%{?dist}
+Release:        27.beta2%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -211,18 +211,6 @@ Please reboot your system to complete the upgrade.
 
 EOF
 fi
-
-%post -n akmod-%{name}
-# The akmods.service will automatically build the module on next boot.
-# We just ensure the SRPM is in place and trigger a rebuild marker.
-
-# Create a marker to ensure akmods processes this on next boot
-touch /var/cache/akmods/%{name}-kmod-needs-build 2>/dev/null || true
-
-echo ""
-echo "Kernel module will be compiled automatically on next boot."
-echo "The akmods.service handles this during system startup."
-echo ""
 
 %files
 %license LICENSE
