@@ -17,8 +17,15 @@ RM ?= rm -f
 PWD ?= $(shell pwd)
 BUILD ?= build
 KVER ?= 
+KDIR ?=
+# Validate required variables before proceeding
+ifeq ($(KVER),)
+$(error KVER must be set. Use: make KVER=<version> KDIR=<path> modules)
+endif
+ifeq ($(KDIR),)
+$(error KDIR must be set. Use: make KVER=<version> KDIR=<path> modules)
+endif
 KERNELREL ?= /lib/modules/$(KVER)
-KDIR ?= $(KERNELREL)/build
 KERNELDIR ?= $(KDIR)
 PREFIX ?= /usr
 UBENCH = 0
