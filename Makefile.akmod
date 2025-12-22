@@ -18,13 +18,6 @@ PWD ?= $(shell pwd)
 BUILD ?= build
 KVER ?= 
 KDIR ?=
-# Validate required variables before proceeding
-ifeq ($(KVER),)
-$(error KVER must be set. Use: make KVER=<version> KDIR=<path> modules)
-endif
-ifeq ($(KDIR),)
-$(error KDIR must be set. Use: make KVER=<version> KDIR=<path> modules)
-endif
 KERNELREL ?= /lib/modules/$(KVER)
 KERNELDIR ?= $(KDIR)
 PREFIX ?= /usr
@@ -183,8 +176,10 @@ $(BUILD)/.prepare-stamp:
 	fi
 	@touch $@
 
-# Kernel module build (from original)
+# Kernel module build
 $(BUILD)/corefreqk.ko: $(BUILD)/.prepare-stamp
+	@[ -n "$(KVER)" ] || exit 1
+	@[ -n "$(KDIR)" ] || exit 1
 	@if [ -e $(BUILD)/Makefile ]; then \
 	    if [ -z $(V) ]; then \
 		$(MAKE) --no-print-directory -C $(KERNELDIR) \
@@ -253,51 +248,3 @@ $(BUILD)/corefreq-cli:	$(BUILD)/corefreq-cli.o \
 	  $(BUILD)/corefreq-cli-extra.o -lm -lrt -lc
 
 userspace: $(BUILD)/corefreqd $(BUILD)/corefreq-cli
-
-# Clean (from original)
-clean:
-	@if [ -e $(BUILD)/Makefile ]; then \
-	    if [ -z $(V) ]; then \
-		if [ $(SILENT) -eq 0 ]; then \
-			echo "  RM [M] $(PWD)/$(BUILD)"; \
-		fi; \
-		$(MAKE) -s -C $(KERNELDIR) M=$(PWD)/$(BUILD) clean; \
-	    else \
-		$(MAKE) -C $(KERNELDIR) M=$(PWD)/$(BUILD) clean; \
-	    fi \
-	fi
-	@if [ -e $(BUILD)/corefreqd ]; then \
-		if [ $(SILENT) -eq 0 ]; then \
-			echo "  RM [$(BUILD)/corefreqd]"; \
-		fi; \
-		$(RM) $(BUILD)/corefreqd; \
-	fi
-	@if [ -e $(BUILD)/corefreq-cli ]; then \
-		if [ $(SILENT) -eq 0 ]; then \
-			echo "  RM [$(BUILD)/corefreq-cli]"; \
-		fi; \
-		$(RM) $(BUILD)/corefreq-cli; \
-	fi
-	@if [ -e $(BUILD)/module/corefreqk.c ]; then \
-		if [ $(SILENT) -eq 0 ]; then \
-			echo "  RM [$(BUILD)/module/corefreqk.c]"; \
-		fi; \
-		$(RM) $(BUILD)/module/corefreqk.c; \
-	fi
-	@if [ -e $(BUILD)/Makefile ]; then \
-		if [ $(SILENT) -eq 0 ]; then \
-			echo "  RM [$(BUILD)/Makefile]"; \
-		fi; \
-		$(RM) $(BUILD)/Makefile; \
-	fi
-	@if [ -d $(BUILD)/module ]; then \
-		if [ $(SILENT) -eq 0 ]; then \
-			echo "  RD [$(BUILD)/module]"; \
-		fi; \
-		$(RMDIR) $(BUILD)/module; \
-	fi
-	@if [ -d $(BUILD) ] && [ -z "$(ls -A $(BUILD))" ]; then \
-		$(RM) $(BUILD)/.prepare-stamp; \
-		if [ $(SILENT) -eq 0 ]; then echo "  RD [$(BUILD)]"; fi; \
-		$(RMDIR) $(BUILD); \
-	fi
