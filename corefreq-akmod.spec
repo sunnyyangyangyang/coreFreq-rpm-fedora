@@ -3,7 +3,7 @@
 %global _debuginfo_packages 0
 %global debug_package %{nil}
 %global _dracut_conf_d /usr/lib/dracut/dracut.conf.d
-%global corefreq_version 2.0.9
+%global corefreq_version 2.1.0
 
 Name:           corefreq
 Version:        %{corefreq_version}
@@ -256,6 +256,9 @@ fi
 # Empty dependency anchor package
 
 %changelog
+* Tue, 13 Jan 2026 04:25:53 +0000 github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com> - 2.1.0-1
+- Update to upstream version 2.1.0
+
 * Fri Dec 06 2025 Package Maintainer <package@example.com> - 2.0.9-29
 - Clean up %preun: remove redundant systemctl stop and sleep loop
 - Trust systemd's synchronous stop behavior
