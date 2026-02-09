@@ -30,10 +30,10 @@ TimeoutStartSec=30
 TimeoutStopSec=15
 
 # Security settings
-NoNewPrivileges=false
-PrivateDevices=false
-ProtectSystem=false
-ProtectHome=false
+#NoNewPrivileges=false
+#PrivateDevices=false
+#ProtectSystem=false
+#ProtectHome=false
 
 [Install]
 WantedBy=multi-user.target
