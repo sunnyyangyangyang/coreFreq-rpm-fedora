@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        31%{?dist}
+Release:        32%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -256,10 +256,14 @@ fi
 # Empty dependency anchor package
 
 %changelog
+* Wed, 23 Mar 2026 Sunny Yang <yxh9956@gmail.com> - 2.1.0-32
+- Add aarch64 and ppc64le architecture support
+- Remove .copr directory
+
 * Tue, 13 Jan 2026 04:25:53 +0000 github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com> - 2.1.0-1
 - Update to upstream version 2.1.0
 
-* Fri Dec 06 2025 Package Maintainer <package@example.com> - 2.0.9-29
+* Fri Dec 06 2025 Sunny Yang <yxh9956@gmail.com> - 2.0.9-29
 - Clean up %preun: remove redundant systemctl stop and sleep loop
 - Trust systemd's synchronous stop behavior
 - Maintain consistent upgrade behavior without service restart
@@ -267,7 +271,7 @@ fi
 * Wed Nov 12 2025 github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com> - 2.0.9-1
 - Update to upstream version 2.0.9
 
-* Sun Nov 09 2025 Package Maintainer <package@example.com> - 2.0.8-26
+* Sun Nov 09 2025 Sunny Yang <yxh9956@gmail.com> - 2.0.8-26
 - Adopt NVIDIA-style approach: reboot required after installation
 - Remove all attempts to start service immediately after install
 - Simplified installation flow for better reliability

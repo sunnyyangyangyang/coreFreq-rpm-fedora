@@ -17,7 +17,7 @@ URL:           https://github.com/cyring/CoreFreq
 
 Source0:       corefreq-kmod-%{version}.tar.gz
 
-ExclusiveArch: x86_64
+ExclusiveArch: x86_64 aarch64 ppc64le
 
 # get the needed BuildRequires (in parts depending on what we build for)
 %global AkmodsBuildRequires %{_bindir}/kmodtool
@@ -65,5 +65,5 @@ done
 %{?akmod_install}
 
 %changelog
-* Sat Sep 07 2025 Package Maintainer <package@example.com> - @COREFREQ_VERSION@-@RELEASE@
+* Sat Sep 07 2025 Sunny Yang <yxh9956@gmail.com> - @COREFREQ_VERSION@-@RELEASE@
 - Follow nvidia-kmod pattern for reliable kernel module building
