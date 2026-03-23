@@ -5,7 +5,7 @@
 COREFREQ_MAJOR = 2
 COREFREQ_MINOR = 1
 COREFREQ_REV = 0
-HW = x86_64
+HW ?= x86_64
 CC ?= cc
 WARNING ?= -Wall -Wfatal-errors
 SYMLINK ?= ln -s
