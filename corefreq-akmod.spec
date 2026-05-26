@@ -3,7 +3,7 @@
 %global _debuginfo_packages 0
 %global debug_package %{nil}
 %global _dracut_conf_d /usr/lib/dracut/dracut.conf.d
-%global corefreq_version 2.1.0
+%global corefreq_version 2.1.1
 
 Name:           corefreq
 Version:        %{corefreq_version}
@@ -266,6 +266,9 @@ fi
 # Empty dependency anchor package
 
 %changelog
+* Tue, 26 May 2026 Sunny Yang <yxh9956@gmail.com> - 2.1.1-1
+- Update to upstream version 2.1.1
+
 * Wed, 23 Mar 2026 Sunny Yang <yxh9956@gmail.com> - 2.1.0-32
 - Add aarch64 and ppc64le architecture support
 - Remove .copr directory
