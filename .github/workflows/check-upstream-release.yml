@@ -54,28 +54,7 @@ jobs:
           sed -i "s/^\(%global corefreq_version\s\+\).*/\1${NEW_VERSION}/" corefreq-akmod.spec
           echo "✅ corefreq-akmod.spec updated."
 
-          # 2. Update the .copr/Makefile
-          sed -i "s/^\(VERSION\s*=\s*\).*/\1${NEW_VERSION}/" .copr/Makefile
-          echo "✅ .copr/Makefile updated."
-
-          # --- NEW: PARSE VERSION AND UPDATE Makefile.akmod ---
-          # 3. Parse the new version into MAJOR, MINOR, REV
-          VERSION_MAJOR=$(echo "$NEW_VERSION" | awk -F. '{print $1}')
-          VERSION_MINOR=$(echo "$NEW_VERSION" | awk -F. '{print $2}')
-          VERSION_REV=$(echo "$NEW_VERSION" | awk -F. '{print $3}')
-          
-          # Check if parsing was successful
-          if [ -z "$VERSION_MAJOR" ] || [ -z "$VERSION_MINOR" ] || [ -z "$VERSION_REV" ]; then
-            echo "::error::Failed to parse new version string: ${NEW_VERSION}"
-            exit 1
-          fi
-
-          # 4. Update Makefile.akmod with the new components
-          sed -i "s/^\(COREFREQ_MAJOR\s*=\s*\).*/\1${VERSION_MAJOR}/" Makefile.akmod
-          sed -i "s/^\(COREFREQ_MINOR\s*=\s*\).*/\1${VERSION_MINOR}/" Makefile.akmod
-          sed -i "s/^\(COREFREQ_REV\s*=\s*\).*/\1${VERSION_REV}/" Makefile.akmod
-          echo "✅ Makefile.akmod updated."
-          # --- END NEW SECTION ---
+     # Makefile.akmod uses placeholders, spec %prep handles replacement
 
           echo "Adding changelog entry..."
           CHANGELOG_DATE=$(date -R)
@@ -87,10 +66,8 @@ jobs:
           echo "Committing changes..."
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          
-          # --- CHANGED: Add all three files to the commit ---
-          git add corefreq-akmod.spec .copr/Makefile Makefile.akmod
-          
+
+          git add corefreq-akmod.spec
           git commit -m "chore(release): Bump version to ${NEW_VERSION}"
           git push
           
