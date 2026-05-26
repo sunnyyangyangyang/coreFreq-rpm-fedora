@@ -3,7 +3,7 @@ name: Check for Upstream Release and Update Spec
 on:
   workflow_dispatch:
   schedule:
-    - cron: '33 3 * * *'
+    - cron: '0 12 * * *'
 
 jobs:
   check-and-update:

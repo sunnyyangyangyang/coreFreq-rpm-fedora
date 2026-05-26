@@ -1,10 +1,10 @@
 # CoreFreq Akmod-compatible Makefile
 # Based on the original CoreFreq Makefile with minimal changes for akmod
 
-# Import original variables and settings
-COREFREQ_MAJOR = 2
-COREFREQ_MINOR = 1
-COREFREQ_REV = 0
+# Version placeholders — replaced by spec %prep at build time
+COREFREQ_MAJOR = @COREFREQ_MAJOR@
+COREFREQ_MINOR = @COREFREQ_MINOR@
+COREFREQ_REV = @COREFREQ_REV@
 HW ?= $(shell uname -m)
 CC ?= cc
 WARNING ?= -Wall -Wfatal-errors

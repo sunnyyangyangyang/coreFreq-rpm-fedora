@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        33%{?dist}
+Release:        1%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -62,9 +62,17 @@ Provides:       %{name}-kmod-common = %{?epoch:%{epoch}:}%{version}-%{release}
 This package provides the common files for the %{name} kernel modules.
 
 %prep
-%autosetup -n CoreFreq-%{version} -p1
+%setup -q -n CoreFreq-%{version}
 cp Makefile Makefile.orig
 cp %{SOURCE2} Makefile
+
+# Replace version placeholders in Makefile with actual values from spec
+COREFREQ_MAJOR=$(echo "%{version}" | cut -d. -f1)
+COREFREQ_MINOR=$(echo "%{version}" | cut -d. -f2)
+COREFREQ_REV=$(echo "%{version}" | cut -d. -f3)
+sed -i "s/@COREFREQ_MAJOR@/$COREFREQ_MAJOR/g" Makefile
+sed -i "s/@COREFREQ_MINOR@/$COREFREQ_MINOR/g" Makefile
+sed -i "s/@COREFREQ_REV@/$COREFREQ_REV/g" Makefile
 
 %build
 make %{?_smp_mflags} userspace
