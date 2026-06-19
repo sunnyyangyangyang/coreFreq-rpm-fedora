@@ -145,6 +145,7 @@ endif
 all: userspace modules
 
 # Prepare build environment (from original with modifications)
+$(BUILD)/module/corefreqk.c:
 $(BUILD)/.prepare-stamp:
 	@if [ ! -d $(BUILD) ]; then \
 		if [ $(SILENT) -eq 0 ]; then \
@@ -177,7 +178,7 @@ $(BUILD)/.prepare-stamp:
 	@touch $@
 
 # Kernel module build
-$(BUILD)/corefreqk.ko: $(BUILD)/.prepare-stamp
+$(BUILD)/corefreqk.ko: $(BUILD)/.prepare-stamp $(BUILD)/module/corefreqk.c
 	@[ -n "$(KVER)" ] || exit 1
 	@[ -n "$(KDIR)" ] || exit 1
 	@if [ -e $(BUILD)/Makefile ]; then \

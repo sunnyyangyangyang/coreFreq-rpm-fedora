@@ -3,7 +3,7 @@
 %global _debuginfo_packages 0
 %global debug_package %{nil}
 %global _dracut_conf_d /usr/lib/dracut/dracut.conf.d
-%global corefreq_version 2.1.1
+%global corefreq_version 2.1.2
 
 Name:           corefreq
 Version:        %{corefreq_version}
