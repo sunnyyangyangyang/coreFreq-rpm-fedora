@@ -3,7 +3,7 @@
 %global _debuginfo_packages 0
 %global debug_package %{nil}
 %global _dracut_conf_d /usr/lib/dracut/dracut.conf.d
-%global corefreq_version 2.1.2
+%global corefreq_version 2.1.4
 
 Name:           corefreq
 Version:        %{corefreq_version}
@@ -266,6 +266,14 @@ fi
 # Empty dependency anchor package
 
 %changelog
+* Mon, 17 Aug 2026 Sunny Yang <yxh9956@gmail.com> - 2.1.4-1
+- Update to upstream version 2.1.4
+
+* Fri, 19 Jun 2026 Sunny Yang <yxh9956@gmail.com> - 2.1.2-1
+- Update to upstream version 2.1.2
+- Sync Makefile.akmod with upstream: declare $(BUILD)/module/corefreqk.c as an
+  empty rule and add it as a prerequisite of the .ko target
+
 * Tue, 26 May 2026 Sunny Yang <yxh9956@gmail.com> - 2.1.1-1
 - Update to upstream version 2.1.1
 
