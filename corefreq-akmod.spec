@@ -33,12 +33,15 @@ Requires:       %{name}-kmod = %{?epoch:%{epoch}:}%{version}-%{release}
 Requires:       %{name}-kmod-common = %{?epoch:%{epoch}:}%{version}-%{release}
 
 # Generate akmod metadata
-%{expand:%(kmodtool --target %{_target_cpu} --kmodname %{name} --akmod 2>/dev/null) }
+%{expand:%(kmodtool --target %{_target_cpu} --kmodname %{name} --akmod) }
 
 %description
 CoreFreq is a CPU monitoring software designed for 64-bit Processors.
 This package provides the user-space tools and the akmod source for the
 'corefreqk' kernel module with full automation including Secure Boot support.
+
+The kernel module is built automatically by akmods during installation.
+No system reboot is required.
 
 IMPORTANT: After installation, a REBOOT is required for the kernel module
 to be compiled and loaded automatically.
@@ -194,15 +197,16 @@ cat << 'EOF'
 ✅ CoreFreq Installation Complete
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-⚠️  REBOOT REQUIRED
+The 'corefreqk' kernel module is being compiled by akmods automatically.
+NO REBOOT REQUIRED.
 
-The kernel module will be compiled during the next boot.
-After rebooting, CoreFreq will start automatically.
+To start the daemon immediately:
+  sudo systemctl start corefreqd
 
-To use CoreFreq after reboot:
+To launch the CoreFreq CLI client:
   corefreq-cli
 
-To check service status:
+To inspect daemon status:
   systemctl status corefreqd.service
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -227,13 +231,14 @@ if [ $1 -ne 0 ]; then
     cat << 'EOF'
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ CoreFreq Upgraded
+✅ CoreFreq Upgraded Successfully
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-⚠️  REBOOT REQUIRED
+akmods is recompiling the 'corefreqk' module for your current kernel.
+NO REBOOT REQUIRED.
 
-The kernel module needs to be recompiled for the new version.
-Please reboot your system to complete the upgrade.
+Restart the daemon to reload the updated module and tools:
+  sudo systemctl restart corefreqd
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -252,6 +257,12 @@ fi
 # Empty dependency anchor package
 
 %changelog
+* Thu Oct 01 2026 Sunny Yang <yxh9956@gmail.com> - 2.1.4-2
+- Drop forced reboot requirement after module build
+- Streamline post-install output messages for seamless on-the-fly startup
+- Update post/postun banner messages to match gddr7_temp non-reboot workflow
+- Remove the github actions
+
 * Mon, 17 Aug 2026 Sunny Yang <yxh9956@gmail.com> - 2.1.4-1
 - Update to upstream version 2.1.4
 
