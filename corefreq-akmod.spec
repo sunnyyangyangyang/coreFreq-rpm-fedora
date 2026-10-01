@@ -43,9 +43,6 @@ This package provides the user-space tools and the akmod source for the
 The kernel module is built automatically by akmods during installation.
 No system reboot is required.
 
-IMPORTANT: After installation, a REBOOT is required for the kernel module
-to be compiled and loaded automatically.
-
 %package kmod-common
 Summary:        Common files for %{name} kernel module
 Requires:       %{name} = %{?epoch:%{epoch}:}%{version}-%{release}
