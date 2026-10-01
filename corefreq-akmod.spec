@@ -7,7 +7,7 @@
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
@@ -33,7 +33,7 @@ Requires:       %{name}-kmod = %{?epoch:%{epoch}:}%{version}-%{release}
 Requires:       %{name}-kmod-common = %{?epoch:%{epoch}:}%{version}-%{release}
 
 # Generate akmod metadata
-%{expand:%(kmodtool --target %{_target_cpu} --kmodname %{name} --pattern ".*" --akmod 2>/dev/null) }
+%{expand:%(kmodtool --target %{_target_cpu} --kmodname %{name} --akmod 2>/dev/null) }
 
 %description
 CoreFreq is a CPU monitoring software designed for 64-bit Processors.
