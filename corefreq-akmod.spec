@@ -43,13 +43,6 @@ This package provides the user-space tools and the akmod source for the
 IMPORTANT: After installation, a REBOOT is required for the kernel module
 to be compiled and loaded automatically.
 
-%package -n akmod-%{name}
-Summary:        Akmod package for %{name} kernel module(s)
-Requires:       kmodtool
-Requires:       akmods
-Provides:       %{name}-kmod = %{?epoch:%{epoch}:}%{version}-%{release}
-Requires:       %{name}-kmod-common = %{?epoch:%{epoch}:}%{version}-%{release}
-
 %description -n akmod-%{name}
 This package provides the akmod package for the %{name} kernel modules.
 
@@ -257,10 +250,6 @@ fi
 %{_bindir}/corefreqd
 %{_unitdir}/corefreqd.service
 %{_dracut_conf_d}/99-corefreq.conf
-
-%files -n akmod-%{name}
-%{_usrsrc}/akmods/corefreq-kmod-%{version}-*.src.rpm
-%{_usrsrc}/akmods/corefreq-kmod.latest
 
 %files kmod-common
 # Empty dependency anchor package
