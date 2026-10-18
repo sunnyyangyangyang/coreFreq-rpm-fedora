@@ -3,11 +3,11 @@
 %global _debuginfo_packages 0
 %global debug_package %{nil}
 %global _dracut_conf_d /usr/lib/dracut/dracut.conf.d
-%global corefreq_version 2.1.4
+%global corefreq_version 2.1.5
 
 Name:           corefreq
 Version:        %{corefreq_version}
-Release:        2%{?dist}
+Release:        1%{?dist}
 Summary:        CPU monitoring software with akmod kernel module
 
 License:        GPL-2.0-only
